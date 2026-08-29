@@ -1,0 +1,16 @@
+app:
+  name: agri-shock
+  environment: development
+  timezone: UTC
+
+streaming:
+  shock_lookahead_days: null  # Set only after Phase 2/3 source-lateness analysis.
+  watermark_hours: null       # Set from observed lateness, never guessed.
+
+sources:
+  data_gov_in:
+    enabled: false
+  imd:
+    enabled: false
+  gdacs:
+    enabled: false
