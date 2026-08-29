@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from agri_shock.common.events import EventEnvelope
 from agri_shock.ingestion.base import ProducerBase, ProducerReport
 from agri_shock.ingestion.normalizers import normalize_flood
+from agri_shock.ingestion.http import fetch_json
 
 
 class FloodProducer(ProducerBase):
@@ -24,3 +25,9 @@ class FloodProducer(ProducerBase):
                 rejected += 1
         report = self.publish_events(events, lambda event: str(event.payload["source_event_id"]))
         return ProducerReport(report.published, report.rejected + rejected)
+
+    def fetch_and_ingest(self, url: str) -> ProducerReport:
+        payload = fetch_json(url)
+        if not isinstance(payload, Mapping) or not isinstance(payload.get("features"), list):
+            raise ValueError("GDACS response lacks GeoJSON features")
+        return self.ingest(payload["features"])

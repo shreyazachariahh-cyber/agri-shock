@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from agri_shock.common.events import EventEnvelope
 from agri_shock.ingestion.base import ProducerBase, ProducerReport
 from agri_shock.ingestion.normalizers import normalize_weather
+from agri_shock.ingestion.http import fetch_json
 
 
 class WeatherProducer(ProducerBase):
@@ -24,3 +25,7 @@ class WeatherProducer(ProducerBase):
                 rejected += 1
         report = self.publish_events(events, lambda event: "|".join(str(event.payload.get(field) or "unknown") for field in ("state", "district")))
         return ProducerReport(report.published, report.rejected + rejected)
+
+    def fetch_and_ingest(self, url: str) -> ProducerReport:
+        payload = fetch_json(url)
+        return self.ingest(payload if isinstance(payload, list) else [payload])
