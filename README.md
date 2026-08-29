@@ -42,6 +42,14 @@ commit `.env`.
 - Replayed historical data and synthetic failure tests are labelled as such.
 - Geography is normalized to canonical IDs, not display-name joins.
 
+## Replay mode
+
+Use `python -m agri_shock.ingestion.replay path/to/events.ndjson`. Input must
+explicitly use `replayed_historical` or `synthetic_failure_injection` as its
+source label; original `event_time` is preserved. The current CLI uses an
+in-memory sink for local validation. Kafka delivery requires the optional
+`confluent-kafka` runtime dependency and a reachable broker.
+
 ## Documentation
 
 - [Source validation](docs/data-sources.md)
