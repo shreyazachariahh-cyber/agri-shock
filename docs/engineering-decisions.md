@@ -22,3 +22,18 @@
 - **Why:** a duration without source-lateness evidence would be arbitrary.
 - **Next:** record observed source/fixture lateness, choose per-stream
   percentiles plus operational margin, and document beyond-watermark handling.
+
+## Runtime matrix
+
+- **Problem:** Spark, Delta, Kafka connectors, Java, and Python must be aligned
+  before a real streaming service is built.
+- **Choice:** Python 3.11, Java 17, Spark/PySpark 3.5.6, Scala 2.12, Delta
+  3.2.1, and `spark-sql-kafka-0-10_2.12:3.5.6`; keep Kafka 3.8.0 and
+  Elasticsearch/Kibana 8.15.2 together.
+- **Why:** Spark 3.5.6 is the maintained 3.5 release; Delta documents 3.2.x ↔
+  Spark 3.5.x compatibility. Python 3.11 is deliberately chosen for the Spark
+  runtime because PySpark 3.5.6 package classifiers explicitly cover it, while
+  this project host's Python 3.12 combination has not been runtime-verified.
+- **Trade-off:** developers with only Python 3.12 can run core tests but need a
+  Python 3.11 environment/container for Spark execution.
+- **Sources:** [Spark 3.5.6 installation](https://spark.apache.org/docs/3.5.6/api/python/getting_started/install.html), [Spark 3.5.6 overview](https://spark.apache.org/docs/3.5.6/), [Delta compatibility](https://docs.delta.io/releases/).
