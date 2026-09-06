@@ -27,3 +27,16 @@ kafka:
   retry:
     max_attempts: 3
     initial_backoff_seconds: 1
+
+# The analytical policy is deliberately explicit rather than inferred from a
+# single event. These provisional values are configuration, not causal claims;
+# calibrate them only after a documented evaluation set exists.
+signal:
+  max_shock_severity: 20
+  max_price_decline: 30
+  max_robust_abnormality: 20
+  max_temporal_proximity: 10
+  max_control_difference: 20
+  lookahead_days: 14
+  high_threshold: 70
+  medium_threshold: 40

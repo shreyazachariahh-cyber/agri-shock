@@ -36,6 +36,24 @@
 - **Next:** record observed source/fixture lateness, choose per-stream
   percentiles plus operational margin, and document beyond-watermark handling.
 
+## Signal strength is separate from data confidence
+
+- **Problem:** a single "distress score" obscures uncertainty and suggests a
+  causal conclusion the data cannot establish.
+- **Choice:** emit a `MarketShockSignal` with an additive, configured
+  `signal_strength` (0–100) and an independent `data_confidence` value plus
+  machine-readable reasons. Critical failures—missing canonical geography,
+  shock time, required fields, or a minimum historical baseline—produce
+  `INSUFFICIENT_EVIDENCE` instead of a numeric result.
+- **Why:** reviewers can distinguish strong statistical co-occurrence from
+  reliable evidence. A missing control comparison reduces confidence but does
+  not erase the observed local movement.
+- **Trade-off:** the provisional contribution caps (20/30/20/10/20) and
+  thresholds are transparent configuration rather than calibrated truth. They
+  require future evaluation against a documented, representative dataset.
+- **Naming:** this replaces distress-oriented analytical naming. It is a market
+  shock signal, never evidence of farmer distress, exploitation, or causation.
+
 ## Runtime matrix
 
 - **Problem:** Spark, Delta, Kafka connectors, Java, and Python must be aligned

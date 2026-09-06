@@ -12,8 +12,9 @@ not causation.
 
 ## Status
 
-Phase 1 foundation complete. Local Docker is not installed, therefore Docker,
-Kafka, Spark, Elasticsearch, and Kibana have not been run in this workspace.
+Phase 6 analytical signal methodology is complete. Local Docker is not
+installed, therefore Docker, Kafka, Spark, Elasticsearch, and Kibana have not
+been run in this workspace.
 See [data-source feasibility](docs/data-sources.md).
 
 ## Intended data flow
@@ -56,6 +57,7 @@ in-memory sink for local validation. Kafka delivery requires the optional
 - [Architecture](docs/architecture.md)
 - [Data model](docs/data-model.md)
 - [Engineering decisions](docs/engineering-decisions.md)
+- [Market shock signal methodology](docs/signal-methodology.md)
 - [Limitations](docs/limitations.md)
 
 ## License
