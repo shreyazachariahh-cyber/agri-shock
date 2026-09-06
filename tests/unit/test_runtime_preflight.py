@@ -1,4 +1,6 @@
 from pathlib import Path
+from hashlib import sha256
+import json
 
 from agri_shock.runtime import preflight
 
@@ -32,3 +34,23 @@ def test_invalid_kafka_bootstrap_is_an_actionable_service_failure(monkeypatch) -
     kafka = next(result for result in results if result.name == "kafka")
     assert not kafka.ok
     assert "host:port" in kafka.detail
+
+
+def test_native_windows_requires_a_verified_hadoop_helper(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(preflight.platform, "system", lambda: "Windows")
+    missing = preflight._windows_hadoop_check({})
+    assert not missing.ok
+    assert "WSL2" in missing.detail
+
+    executable = tmp_path / "hadoop" / "bin" / "winutils.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"organization-approved-test-helper")
+    manifest = tmp_path / "helper.json"
+    manifest.write_text(json.dumps({
+        "hadoop_version": "3.3.4",
+        "artifact": str(executable),
+        "sha256": sha256(executable.read_bytes()).hexdigest(),
+        "provenance": "organization-controlled build",
+    }), encoding="utf-8")
+    result = preflight._windows_hadoop_check({"HADOOP_HOME": str(tmp_path / "hadoop"), "AGRISHOCK_WINUTILS_MANIFEST": str(manifest)})
+    assert result.ok

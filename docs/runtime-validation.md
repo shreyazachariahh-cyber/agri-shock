@@ -1,15 +1,55 @@
-# Local runtime validation (Windows PowerShell)
+# Local runtime validation (Windows PowerShell and WSL2)
 
 This runbook validates Kafka to Spark to Delta to Elasticsearch with synthetic
 demo events only. It does not validate public-source access, real mandi
 observations, or causal claims.
 
-## Prerequisites
+## Windows Spark runtime choice
 
 - Docker Desktop running; Kafka, Elasticsearch, and Kibana run in Compose.
 - Python 3.11, Java 17, and an active project virtual environment.
-- Spark runs on the Windows host, not in Docker. Host Spark uses
-  `localhost:9092`; Compose services use `kafka:9092` internally.
+
+### Recommended: run Spark in WSL2
+
+Native Windows Hadoop requires `winutils.exe` for the PySpark/Hadoop local-file
+path. AgriShock does **not** download or distribute this executable because an
+unverified binary would be a supply-chain risk. The project-supported path is
+WSL2/Linux, where that Windows helper is not required.
+
+Open an Administrator PowerShell and run:
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Restart if Windows requests it, launch Ubuntu once to create a Linux user, then
+clone/open the repository inside the Linux filesystem (for example,
+`~/src/agri-shock`) and follow the same Python 3.11/Java 17 commands there.
+Docker Desktop must have WSL integration enabled for Ubuntu. Linux Spark uses
+`localhost:9092` and `localhost:9200` when Docker Desktop exposes the ports.
+Microsoft documents `wsl --install` as the supported installation path for
+Windows 10 version 2004+ and Windows 11.
+
+### Direct native Windows Spark: only with an approved helper
+
+Direct Windows is not the recommended project runtime. Use it only when your
+organization provides a Hadoop **3.3.4** `winutils.exe` through its approved
+software distribution or an internally reproducible build process. Do not
+download an arbitrary helper from GitHub.
+
+Before running Spark, set `HADOOP_HOME` to the parent containing
+`bin\winutils.exe`, create a manifest from
+`config/windows-hadoop-helper.example.json`, fill in the artifact path and the
+SHA-256 from `Get-FileHash`, then set:
+
+```powershell
+$env:HADOOP_HOME = "C:\approved-hadoop-3.3.4"
+$env:AGRISHOCK_WINUTILS_MANIFEST = "C:\approved-hadoop-3.3.4\agrishock-winutils.json"
+```
+
+Preflight verifies the path, Hadoop version declaration, artifact path, and
+SHA-256 before any SparkContext is created. A missing or unverifiable helper
+is a hard failure with a WSL2 recommendation.
 
 ## Start services
 
@@ -52,8 +92,9 @@ python -m agri_shock.runtime.preflight
 
 ## Smoke test
 
-In a second PowerShell window, activate the same virtual environment, set the
-same environment values, and start Spark. Leave it running:
+In a second terminal in the selected supported runtime (WSL2 recommended),
+activate the same virtual environment, set the same environment values, and
+start Spark. Leave it running:
 
 ```powershell
 python -m agri_shock.streaming.app
@@ -101,7 +142,9 @@ In Kibana use the Phase 7 `agrishock-signals` data view and filter
 `fixture_kind: synthetic_demo`.
 
 If Kafka is unreachable, wait for `kafka-init` in `docker compose ps` and use
-`localhost:9092` from the host. If no Gold association exists, verify Spark is
-running and all environment values match in both windows. If imports fail, use
-Java 17 and Python 3.11 with `.[streaming]` installed. This host has not
-live-run the stack; unit tests and preflight are not live integration proof.
+`localhost:9092` from the host/WSL runtime. If no Gold association exists,
+verify Spark is running and all environment values match in both terminals. If
+preflight reports `windows-hadoop`, use WSL2 or obtain an organization-approved
+and checksummed helper; do not bypass the check. If imports fail, use Java 17
+and Python 3.11 with `.[streaming]` installed. This host has not live-run the
+stack; unit tests and preflight are not live integration proof.

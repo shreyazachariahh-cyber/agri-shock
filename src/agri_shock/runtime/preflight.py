@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from hashlib import sha256
 import importlib.util
+import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import socket
 import subprocess
@@ -72,6 +75,41 @@ def _root_path_check(name: str, value: str) -> CheckResult:
     )
 
 
+def _windows_hadoop_check(env: dict[str, str]) -> CheckResult:
+    """Require an auditable helper for direct Windows Spark, never a random binary."""
+    if platform.system() != "Windows":
+        return CheckResult("windows-hadoop", True, "not required outside native Windows")
+    hadoop_home = env.get("HADOOP_HOME", "")
+    manifest_path = env.get("AGRISHOCK_WINUTILS_MANIFEST", "")
+    if not hadoop_home or not manifest_path:
+        return CheckResult(
+            "windows-hadoop",
+            False,
+            "native Windows Spark requires an approved Hadoop 3.3.4 helper; use WSL2 (recommended) or set HADOOP_HOME and AGRISHOCK_WINUTILS_MANIFEST",
+        )
+    executable = Path(hadoop_home) / "bin" / "winutils.exe"
+    manifest = Path(manifest_path)
+    if not executable.is_file() or not manifest.is_file():
+        return CheckResult("windows-hadoop", False, "HADOOP_HOME/bin/winutils.exe or its manifest is missing")
+    try:
+        metadata = json.loads(manifest.read_text(encoding="utf-8"))
+        expected_hash = str(metadata["sha256"]).lower()
+        actual_hash = sha256(executable.read_bytes()).hexdigest()
+        valid = (
+            metadata.get("hadoop_version") == "3.3.4"
+            and Path(str(metadata["artifact"])).resolve() == executable.resolve()
+            and expected_hash == actual_hash
+            and expected_hash != "replace-with-the-sha256-of-your-organization-approved-build"
+        )
+    except (KeyError, OSError, json.JSONDecodeError) as error:
+        return CheckResult("windows-hadoop", False, f"invalid approved-helper manifest: {error}")
+    return CheckResult(
+        "windows-hadoop",
+        valid,
+        "approved Hadoop 3.3.4 helper verified" if valid else "helper manifest/version/hash verification failed",
+    )
+
+
 def run_preflight(environment: dict[str, str] | None = None, check_services: bool = True) -> list[CheckResult]:
     """Return every result; callers decide whether a failed preflight aborts."""
     env = os.environ if environment is None else environment
@@ -83,6 +121,7 @@ def run_preflight(environment: dict[str, str] | None = None, check_services: boo
         _module_check("delta"),
         _module_check("sedona"),
         CheckResult("docker", shutil.which("docker") is not None, "available" if shutil.which("docker") else "install Docker Desktop and ensure docker is on PATH"),
+        _windows_hadoop_check(env),
     ]
     required = (
         "WATERMARK_HOURS", "SHOCK_LOOKAHEAD_DAYS", "DELTA_ROOT", "CHECKPOINT_ROOT",

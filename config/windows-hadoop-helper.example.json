@@ -1,0 +1,6 @@
+{
+  "hadoop_version": "3.3.4",
+  "artifact": "C:\\approved-hadoop-3.3.4\\bin\\winutils.exe",
+  "sha256": "replace-with-the-sha256-of-your-organization-approved-build",
+  "provenance": "organization-controlled build or internally approved artifact"
+}
