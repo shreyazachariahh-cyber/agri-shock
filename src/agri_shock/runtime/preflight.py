@@ -53,8 +53,9 @@ def _http_check(url: str) -> CheckResult:
     try:
         with urlopen(url, timeout=3) as response:
             return CheckResult("elasticsearch", 200 <= response.status < 300, f"{url} returned HTTP {response.status}")
-    except URLError as error:
-        return CheckResult("elasticsearch", False, f"not reachable at {url}: {error.reason}")
+    except (OSError, URLError) as error:
+        detail = getattr(error, "reason", error)
+        return CheckResult("elasticsearch", False, f"not reachable at {url}: {detail}")
 
 
 def _root_path_check(name: str, value: str) -> CheckResult:

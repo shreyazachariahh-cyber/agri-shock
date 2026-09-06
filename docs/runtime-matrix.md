@@ -14,7 +14,7 @@
 | Kafka broker | 3.8.0 | Existing local Compose image; compatible with librdkafka-based clients. |
 | Python Kafka client | confluent-kafka 2.9.0 | Mature librdkafka binding with prebuilt runtime for normal local use. |
 | Elasticsearch / Kibana | 8.15.2 / 8.15.2 | Existing identical service versions avoid stack-version drift. |
-| Python Elasticsearch client | 8.15.2 | Match the server minor line for local reproducibility. |
+| Python Elasticsearch client | 8.15.1 | Valid published 8.x client; compatible with the local Elasticsearch 8.15.2 server. |
 
 ## Python 3.12 decision
 
