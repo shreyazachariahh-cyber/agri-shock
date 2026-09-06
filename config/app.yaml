@@ -6,6 +6,8 @@ app:
 streaming:
   shock_lookahead_days: null  # Set only after Phase 2/3 source-lateness analysis.
   watermark_hours: null       # Set from observed lateness, never guessed.
+  market_dimension_path: null # Versioned canonical market reference, not a hardcoded region.
+  district_boundary_path: null # Versioned GeoJSON/Delta boundary reference.
 
 sources:
   data_gov_in:

@@ -13,8 +13,11 @@ from agri_shock.common.config import Settings
 from agri_shock.common.logging import configure_logging
 from agri_shock.streaming.contracts import EventTimePolicy
 from agri_shock.streaming.pipeline import kafka_input, parse_mandi, write_delta
+from agri_shock.geospatial.spark import canonicalize_markets, flood_shocks, weather_shocks
+from agri_shock.streaming.joins import ShockJoinPolicy, join_shocks_to_prices
 
 KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.6"
+SEDONA_PACKAGE = "org.apache.sedona:sedona-spark-shaded-3.5_2.12:1.9.0"
 
 
 def create_streaming_spark(app_name: str = "agrishock-streaming") -> Any:
@@ -26,7 +29,10 @@ def create_streaming_spark(app_name: str = "agrishock-streaming") -> Any:
     builder = (SparkSession.builder.appName(app_name)
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"))
-    return configure_spark_with_delta_pip(builder, extra_packages=[KAFKA_PACKAGE]).getOrCreate()
+    spark = configure_spark_with_delta_pip(builder, extra_packages=[KAFKA_PACKAGE, SEDONA_PACKAGE]).getOrCreate()
+    from sedona.spark import SedonaContext
+    SedonaContext.create(spark)
+    return spark
 
 
 def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fields: list[str], policy: EventTimePolicy) -> tuple[Any, Any]:
@@ -48,7 +54,7 @@ def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fiel
         valid = valid & (F.length(F.trim(F.col(f"payload.{field}"))) > 0)
     invalid = parsed.filter(~valid)
     return (parsed.filter(valid).withWatermark("event_time", policy.spark_duration)
-        .dropDuplicates(["event_id"]).select("event_id", "event_time", "ingestion_time", "source", "payload.*"), invalid)
+        .dropDuplicates(["event_id"]).select("event_id", "event_time", "ingestion_time", "source", "raw_json", "payload.*"), invalid)
 
 
 def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> Any:
@@ -66,6 +72,10 @@ def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> 
 def start_application(settings: Settings) -> list[Any]:
     if settings.watermark_hours is None:
         raise ValueError("WATERMARK_HOURS must be explicitly configured before starting Spark")
+    if settings.shock_lookahead_days is None:
+        raise ValueError("SHOCK_LOOKAHEAD_DAYS must be explicitly configured before starting Spark")
+    if settings.market_dimension_path is None or settings.district_boundary_path is None:
+        raise ValueError("MARKET_DIMENSION_PATH and DISTRICT_BOUNDARY_PATH are required for geographic association")
     policy = EventTimePolicy(settings.watermark_hours)
     spark = create_streaming_spark()
     root, checkpoints = Path(settings.delta_root), Path(settings.checkpoint_root)
@@ -86,6 +96,12 @@ def start_application(settings: Settings) -> list[Any]:
         write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood"),
         start_dlq(mandi_invalid.unionByName(weather_invalid, allowMissingColumns=True).unionByName(flood_invalid, allowMissingColumns=True), settings, str(checkpoints / "dlq")),
     ])
+    market_dimension = spark.read.format("delta").load(settings.market_dimension_path)
+    district_boundaries = spark.read.format("delta").load(settings.district_boundary_path)
+    canonical_prices = canonicalize_markets(mandi, market_dimension)
+    shocks = weather_shocks(weather, district_boundaries).unionByName(flood_shocks(flood, district_boundaries))
+    associations = join_shocks_to_prices(shocks, canonical_prices, ShockJoinPolicy(settings.shock_lookahead_days))
+    queries.append(write_delta(associations, str(root / "gold" / "shock_price_associations"), str(checkpoints / "gold_associations"), "agrishock-gold-associations"))
     return queries
 
 

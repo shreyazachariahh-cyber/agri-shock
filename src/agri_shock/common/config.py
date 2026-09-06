@@ -25,6 +25,8 @@ class Settings:
     watermark_hours: int | None
     delta_root: str
     checkpoint_root: str
+    market_dimension_path: str | None
+    district_boundary_path: str | None
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -37,4 +39,6 @@ class Settings:
             watermark_hours=_positive_int_or_none(os.getenv("WATERMARK_HOURS"), "WATERMARK_HOURS"),
             delta_root=os.getenv("DELTA_ROOT", "data/local/delta"),
             checkpoint_root=os.getenv("CHECKPOINT_ROOT", "data/checkpoints"),
+            market_dimension_path=os.getenv("MARKET_DIMENSION_PATH") or None,
+            district_boundary_path=os.getenv("DISTRICT_BOUNDARY_PATH") or None,
         )

@@ -16,6 +16,7 @@ streaming = [
     "delta-spark==3.2.1",
     "confluent-kafka==2.9.0",
     "elasticsearch==8.15.2",
+    "apache-sedona==1.9.0",
 ]
 
 [tool.pytest.ini_options]
