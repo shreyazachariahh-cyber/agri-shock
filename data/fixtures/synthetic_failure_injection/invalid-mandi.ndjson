@@ -1,0 +1,1 @@
+{"event_id":"synthetic-invalid-mandi-001","event_type":"mandi_price","event_time":"2025-08-01T00:00:00+00:00","ingestion_time":"2025-08-01T00:05:00+00:00","source":"synthetic_failure_injection","schema_version":"1.0","payload":{"state":"Maharashtra","district":"Nashik","market":"Lasalgaon","commodity":"Onion","min_price":"100","modal_price":"-1","max_price":"200"}}

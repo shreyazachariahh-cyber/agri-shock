@@ -49,6 +49,8 @@ class KafkaJsonPublisher:
                 delivered.append(PublishError(str(error)))
 
         self._producer.produce(topic, key=key.encode(), value=event.to_json().encode(), on_delivery=callback)
-        self._producer.flush(10)
+        remaining = self._producer.flush(10)
+        if remaining:
+            raise PublishError(f"Kafka delivery timed out with {remaining} undelivered message(s)")
         if delivered:
             raise delivered[0]

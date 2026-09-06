@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import time
 
 from agri_shock.common.events import EventEnvelope
-from agri_shock.ingestion.publisher import EventPublisher, MemoryPublisher
+from agri_shock.ingestion.publisher import EventPublisher, KafkaJsonPublisher, MemoryPublisher
 
 
 def parse_event(line: str) -> EventEnvelope:
@@ -43,10 +44,11 @@ def main() -> None:
     parser.add_argument("path", type=Path)
     parser.add_argument("--topic", default="mandi-prices")
     parser.add_argument("--events-per-second", type=float, default=1.0)
+    parser.add_argument("--sink", choices=("memory", "kafka"), default="memory")
     args = parser.parse_args()
-    publisher = MemoryPublisher()
+    publisher: EventPublisher = MemoryPublisher() if args.sink == "memory" else KafkaJsonPublisher(os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"))
     count = replay(args.path, publisher, args.topic, args.events_per_second)
-    print(f"Replayed {count} labelled events to in-memory sink; use KafkaJsonPublisher in service runtime.")
+    print(f"Replayed {count} labelled events to {args.sink} sink.")
 
 
 if __name__ == "__main__":
