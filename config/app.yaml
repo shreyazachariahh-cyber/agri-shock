@@ -20,7 +20,7 @@ kafka:
     mandi_prices: mandi-prices
     weather_events: weather-events
     flood_events: flood-events
-    distress_alerts: distress-alerts
+    market_shock_signals: market-shock-signals
     dead_letter_events: dead-letter-events
   retry:
     max_attempts: 3

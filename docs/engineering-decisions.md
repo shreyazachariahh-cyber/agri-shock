@@ -16,6 +16,19 @@
   would cause avoidable skew.
 - **Trade-off:** large markets may need measured, deterministic salting later.
 
+## Kafka listeners and topic bootstrap
+
+- **Problem:** the former single advertised address `kafka:9092` was reachable
+  only from containers; Windows clients could bootstrap through a mapped port
+  but then receive unreachable broker metadata.
+- **Choice:** `INTERNAL://kafka:9092` for Compose clients and
+  `EXTERNAL://localhost:9092` for host clients, plus an idempotent
+  `kafka-init` service.
+- **Trade-off:** this is a single-node, plaintext local setup. Production needs
+  multiple brokers, TLS/SASL, ACLs, replication, and external DNS addresses.
+- **Naming:** new output topic is `market-shock-signals`; this safer term does
+  not assert farmer distress or causal attribution.
+
 ## No default watermark
 
 - **Choice:** `watermark_hours` is unset in Phase 1.
