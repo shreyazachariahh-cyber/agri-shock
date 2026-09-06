@@ -39,6 +39,12 @@ not a substitute for source-attributed records.
 The physical Delta lineage, deterministic keys, replay behavior, and schema
 evolution policy are described in [the medallion architecture](docs/medallion-architecture.md).
 
+## Local runtime validation
+
+For a Windows PowerShell synthetic-stack run covering Kafka → Spark → Delta →
+Elasticsearch → Kibana, follow [the runtime validation runbook](docs/runtime-validation.md).
+It does not claim that the fixture represents real agricultural observations.
+
 ## Quick start (foundation)
 
 ```powershell
@@ -85,6 +91,7 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Recruiter demo runbook](docs/demo-runbook.md)
 - [Kibana dashboard specification](dashboards/kibana/README.md)
 - [Delta medallion architecture](docs/medallion-architecture.md)
+- [Windows runtime validation](docs/runtime-validation.md)
 - [Limitations](docs/limitations.md)
 
 ## License
