@@ -23,6 +23,8 @@ class Settings:
     log_level: str
     shock_lookahead_days: int | None
     watermark_hours: int | None
+    delta_root: str
+    checkpoint_root: str
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -33,4 +35,6 @@ class Settings:
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             shock_lookahead_days=_positive_int_or_none(os.getenv("SHOCK_LOOKAHEAD_DAYS"), "SHOCK_LOOKAHEAD_DAYS"),
             watermark_hours=_positive_int_or_none(os.getenv("WATERMARK_HOURS"), "WATERMARK_HOURS"),
+            delta_root=os.getenv("DELTA_ROOT", "data/local/delta"),
+            checkpoint_root=os.getenv("CHECKPOINT_ROOT", "data/checkpoints"),
         )
