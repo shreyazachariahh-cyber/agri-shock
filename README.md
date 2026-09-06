@@ -1,8 +1,9 @@
 # AgriShock
 
-Real-time, event-time analytics for **potential agricultural distress-sale
-signals**: unusual mandi price declines that occur after documented
-environmental shocks and differ from historical/control-market movement.
+AgriShock is a portfolio-grade, event-time data platform for investigating
+whether an environmental shock is followed by an unusual local mandi price
+movement relative to a historical baseline and comparable markets. Its output
+is a transparent **market shock signal**, never a causal finding.
 
 ## Scientific limitation
 
@@ -12,17 +13,28 @@ not causation.
 
 ## Status
 
-Phase 6 analytical signal methodology is complete. Local Docker is not
-installed, therefore Docker, Kafka, Spark, Elasticsearch, and Kibana have not
-been run in this workspace.
+Phase 7 recruiter demo assets and Elasticsearch delivery contract are complete.
+Docker is not installed on this host, so Docker, Kafka, Spark, Elasticsearch,
+and Kibana have not been run here.
 See [data-source feasibility](docs/data-sources.md).
 
-## Intended data flow
+## Architecture
 
-```text
-Public sources / historical replay → Kafka → Spark Structured Streaming
-→ Delta Bronze/Silver/Gold → Elasticsearch → Kibana
+```mermaid
+flowchart LR
+  A[Public sources / labelled replay] --> B[Kafka topics]
+  B --> C[Spark Structured Streaming]
+  C --> D[Delta Bronze]
+  D --> E[Delta Silver: validated + canonical geography]
+  E --> F[Delta Gold: shock-price association]
+  F --> G[MarketShockSignal + data confidence]
+  G --> H[Elasticsearch]
+  H --> I[Kibana explorer]
 ```
+
+The demo fixture starts at the Gold-to-Elasticsearch boundary when a full
+source/Spark runtime is unavailable. It is explicitly marked synthetic and is
+not a substitute for source-attributed records.
 
 ## Quick start (foundation)
 
@@ -51,6 +63,15 @@ source label; original `event_time` is preserved. The current CLI uses an
 in-memory sink for local validation. Kafka delivery requires the optional
 `confluent-kafka` runtime dependency and a reachable broker.
 
+## Recruiter demo
+
+Run the [end-to-end demo](docs/demo-runbook.md) to index a multi-state,
+synthetic historical-context fixture into Elasticsearch and explore it in
+Kibana. It covers Assam and Bihar floods, Kerala flood context, Maharashtra
+drought context, and Himachal Pradesh landslide context across ten distinct
+district/commodity scenarios. The numbers are intentionally synthetic; see
+[fixture provenance](data/sample/README.md).
+
 ## Documentation
 
 - [Source validation](docs/data-sources.md)
@@ -58,6 +79,8 @@ in-memory sink for local validation. Kafka delivery requires the optional
 - [Data model](docs/data-model.md)
 - [Engineering decisions](docs/engineering-decisions.md)
 - [Market shock signal methodology](docs/signal-methodology.md)
+- [Recruiter demo runbook](docs/demo-runbook.md)
+- [Kibana dashboard specification](dashboards/kibana/README.md)
 - [Limitations](docs/limitations.md)
 
 ## License

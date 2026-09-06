@@ -54,6 +54,21 @@
 - **Naming:** this replaces distress-oriented analytical naming. It is a market
   shock signal, never evidence of farmer distress, exploitation, or causation.
 
+## Elasticsearch delivery uses a strict, versioned document contract
+
+- **Problem:** dashboards need low-latency filter, map, and aggregation fields
+  without re-implementing Gold-table semantics in every visualization.
+- **Choice:** index signal documents into the versioned
+  `agrishock-market-shock-signals-v1` index, keyed by stable `signal_id`.
+  Mapping is strict; identifiers are keywords, event fields are dates,
+  coordinates are `geo_point`, and score components are flattened fields.
+- **Why:** stable IDs make replay delivery idempotent, and a strict mapping
+  catches contract drift before it becomes dashboard ambiguity.
+- **Trade-off:** the Phase 7 fixture enters at the Gold-to-Elasticsearch
+  boundary and is explicitly synthetic because a local cluster and verified
+  source-attributed historical market series were unavailable. It proves the
+  delivery interface, not a live end-to-end service run.
+
 ## Runtime matrix
 
 - **Problem:** Spark, Delta, Kafka connectors, Java, and Python must be aligned

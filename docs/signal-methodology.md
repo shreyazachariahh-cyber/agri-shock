@@ -45,8 +45,9 @@ When baseline/geography/timing/required fields are insufficient, the output is
 
 ## Gold analytical contract
 
-The Phase 6 evaluator returns `MarketShockSignal`; Phase 7 materialization
-will emit it with its join provenance as a Gold record. That record will retain
+The Phase 6 evaluator returns `MarketShockSignal`; the Phase 7 Elasticsearch
+delivery contract accepts it with its join provenance as a Gold-like record.
+The materialized production record will retain
 the canonical `state_id`, `district_id`, optional `market_id` and
 `commodity_id`, `shock_id`, `price_event_id`, `event_type`, `shock_time`,
 `price_event_time`, `observed_price`, `baseline_price`, `deviation_pct`,

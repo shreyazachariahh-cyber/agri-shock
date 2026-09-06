@@ -1,7 +1,7 @@
 # Geographic reference-data contracts
 
 The association pipeline is geography and commodity agnostic. It does not ship
-with a Vellore/Tomato or any other locality-specific production mapping.
+with any locality- or commodity-specific production mapping.
 
 ## Market dimension
 
