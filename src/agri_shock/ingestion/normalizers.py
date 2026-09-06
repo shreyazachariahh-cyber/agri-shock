@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
+import json
 from typing import Any, Mapping
 
 from agri_shock.common.events import EventEnvelope, stable_event_id, utc_now
@@ -81,7 +82,7 @@ def normalize_flood(feature: Mapping[str, Any], ingestion_time: datetime | None 
     event_start = _date(_required(properties, "fromdate"), "fromdate")
     payload = {
         "source_event_id": source_id, "event_start": event_start.isoformat(),
-        "event_end": properties.get("todate"), "geometry": geometry,
+        "event_end": properties.get("todate"), "geometry_json": json.dumps(geometry, sort_keys=True),
         "alert_level": properties.get("alertlevel"), "affected_district_ids": [],
     }
     return EventEnvelope(stable_event_id("gdacs", source_id, event_start), "flood_event", event_start, ingestion_time or utc_now(), "gdacs", "1.0", payload)

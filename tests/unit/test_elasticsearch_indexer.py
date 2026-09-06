@@ -4,6 +4,7 @@ import pytest
 
 from agri_shock.elasticsearch.indexer import (
     INDEX_NAME,
+    deduplicate_documents,
     ensure_index,
     index_documents,
     read_ndjson,
@@ -66,6 +67,12 @@ def test_insufficient_evidence_cannot_have_numeric_strength() -> None:
     invalid = document() | {"signal_level": "INSUFFICIENT_EVIDENCE"}
     with pytest.raises(ValueError, match="must not carry"):
         validate_document(invalid)
+
+
+def test_identical_replay_records_collapse_but_conflicting_identity_fails() -> None:
+    assert deduplicate_documents([document(), document()]) == [document()]
+    with pytest.raises(ValueError, match="conflicting"):
+        deduplicate_documents([document(), document() | {"signal_strength": 70.0}])
 
 
 def test_demo_fixture_is_validated_from_ndjson() -> None:

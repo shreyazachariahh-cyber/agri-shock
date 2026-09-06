@@ -3,11 +3,18 @@ from __future__ import annotations
 from typing import Any
 
 def canonicalize_markets(prices: Any, market_dimension: Any) -> Any:
-    """Resolve source market fields through an explicit curated reference table."""
+    """Resolve source market fields through an explicit curated reference table.
+
+    Unresolved records remain visible with `mapping_status=unresolved`; callers
+    must route them to a quality/reconciliation table instead of guessing IDs.
+    """
     from pyspark.sql import functions as F
     normalized = prices.select("*", F.upper(F.trim("state")).alias("_source_state"), F.upper(F.trim("district")).alias("_source_district"), F.upper(F.trim("market")).alias("_source_market"))
     reference = market_dimension.select("market_id", "district_id", "state_id", F.upper(F.trim("source_state")).alias("_source_state"), F.upper(F.trim("source_district")).alias("_source_district"), F.upper(F.trim("source_market")).alias("_source_market"))
-    return normalized.join(reference, ["_source_state", "_source_district", "_source_market"], "inner").drop("_source_state", "_source_district", "_source_market").withColumn("commodity_id", F.sha2(F.upper(F.trim("commodity")), 256))
+    return (normalized.join(reference, ["_source_state", "_source_district", "_source_market"], "left")
+        .drop("_source_state", "_source_district", "_source_market")
+        .withColumn("commodity_id", F.sha2(F.upper(F.trim("commodity")), 256))
+        .withColumn("mapping_status", F.when(F.col("market_id").isNull(), F.lit("unresolved")).otherwise(F.lit("resolved"))))
 
 def flood_shocks(floods: Any, district_boundaries: Any) -> Any:
     """Spatially associate GeoJSON flood geometry to canonical districts."""

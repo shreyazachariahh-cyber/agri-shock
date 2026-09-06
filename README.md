@@ -36,6 +36,9 @@ The demo fixture starts at the Gold-to-Elasticsearch boundary when a full
 source/Spark runtime is unavailable. It is explicitly marked synthetic and is
 not a substitute for source-attributed records.
 
+The physical Delta lineage, deterministic keys, replay behavior, and schema
+evolution policy are described in [the medallion architecture](docs/medallion-architecture.md).
+
 ## Quick start (foundation)
 
 ```powershell
@@ -81,6 +84,7 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Market shock signal methodology](docs/signal-methodology.md)
 - [Recruiter demo runbook](docs/demo-runbook.md)
 - [Kibana dashboard specification](dashboards/kibana/README.md)
+- [Delta medallion architecture](docs/medallion-architecture.md)
 - [Limitations](docs/limitations.md)
 
 ## License

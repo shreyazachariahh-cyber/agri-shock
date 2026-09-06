@@ -12,7 +12,7 @@ from typing import Any
 from agri_shock.common.config import Settings
 from agri_shock.common.logging import configure_logging
 from agri_shock.streaming.contracts import EventTimePolicy
-from agri_shock.streaming.pipeline import kafka_input, parse_mandi, write_delta
+from agri_shock.streaming.pipeline import bronze_events, kafka_input, parse_mandi, write_delta
 from agri_shock.geospatial.spark import canonicalize_markets, flood_shocks, weather_shocks
 from agri_shock.streaming.joins import ShockJoinPolicy, join_shocks_to_prices
 
@@ -54,7 +54,12 @@ def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fiel
         valid = valid & (F.length(F.trim(F.col(f"payload.{field}"))) > 0)
     invalid = parsed.filter(~valid)
     return (parsed.filter(valid).withWatermark("event_time", policy.spark_duration)
-        .dropDuplicates(["event_id"]).select("event_id", "event_time", "ingestion_time", "source", "raw_json", "payload.*"), invalid)
+        .dropDuplicates(["event_id"]).select(
+            "event_id", "event_time", "ingestion_time", "source", "schema_version",
+            F.col("topic").alias("kafka_topic"), F.col("partition").alias("kafka_partition"),
+            F.col("offset").alias("kafka_offset"), "kafka_timestamp",
+            F.col("raw_json").alias("raw_payload"), "payload.*",
+        ), invalid)
 
 
 def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> Any:
@@ -82,26 +87,44 @@ def start_application(settings: Settings) -> list[Any]:
     mandi_raw = kafka_input(spark, settings.kafka_bootstrap_servers, "mandi-prices")
     weather_raw = kafka_input(spark, settings.kafka_bootstrap_servers, "weather-events")
     flood_raw = kafka_input(spark, settings.kafka_bootstrap_servers, "flood-events")
-    bronze = mandi_raw.unionByName(weather_raw).unionByName(flood_raw)
-    queries = [write_delta(bronze, str(root / "bronze" / "raw_events"), str(checkpoints / "bronze_raw"), "agrishock-bronze-raw")]
+    raw_events = mandi_raw.unionByName(weather_raw).unionByName(flood_raw)
+    bronze = bronze_events(raw_events)
+    queries = [write_delta(
+        bronze, str(root / "bronze" / "raw_events"), str(checkpoints / "bronze_raw"),
+        "agrishock-bronze-raw", ["kafka_topic", "source_event_date"],
+    )]
     mandi, mandi_invalid = parse_mandi(mandi_raw, policy)
-    queries.append(write_delta(mandi, str(root / "silver" / "mandi_prices"), str(checkpoints / "silver_mandi"), "agrishock-silver-mandi"))
+    queries.append(write_delta(
+        mandi, str(root / "silver" / "mandi_prices"), str(checkpoints / "silver_mandi"),
+        "agrishock-silver-mandi", ["source"],
+    ))
     from pyspark.sql.types import DecimalType, StringType, StructField, StructType
     weather_payload = StructType([StructField("state", StringType()), StructField("district", StringType()), StructField("rainfall_actual_mm", DecimalType(12, 2)), StructField("rainfall_normal_mm", DecimalType(12, 2)), StructField("rainfall_departure_pct", DecimalType(12, 2)), StructField("rainfall_category", StringType()), StructField("imd_object_id", StringType())])
-    flood_payload = StructType([StructField("source_event_id", StringType()), StructField("event_start", StringType()), StructField("event_end", StringType()), StructField("alert_level", StringType())])
+    flood_payload = StructType([StructField("source_event_id", StringType()), StructField("event_start", StringType()), StructField("event_end", StringType()), StructField("alert_level", StringType()), StructField("geometry_json", StringType())])
     weather, weather_invalid = parse_simple_event(weather_raw, weather_payload, ["district", "rainfall_category"], policy)
     flood, flood_invalid = parse_simple_event(flood_raw, flood_payload, ["source_event_id"], policy)
     queries.extend([
-        write_delta(weather, str(root / "silver" / "weather_events"), str(checkpoints / "silver_weather"), "agrishock-silver-weather"),
-        write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood"),
+        write_delta(weather, str(root / "silver" / "weather_events"), str(checkpoints / "silver_weather"), "agrishock-silver-weather", ["source"]),
+        write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood", ["source"]),
         start_dlq(mandi_invalid.unionByName(weather_invalid, allowMissingColumns=True).unionByName(flood_invalid, allowMissingColumns=True), settings, str(checkpoints / "dlq")),
     ])
     market_dimension = spark.read.format("delta").load(settings.market_dimension_path)
     district_boundaries = spark.read.format("delta").load(settings.district_boundary_path)
-    canonical_prices = canonicalize_markets(mandi, market_dimension)
+    market_resolution = canonicalize_markets(mandi, market_dimension)
+    canonical_prices = market_resolution.filter("mapping_status = 'resolved'")
+    unresolved_markets = market_resolution.filter("mapping_status = 'unresolved'")
+    queries.append(write_delta(
+        unresolved_markets, str(root / "silver" / "unresolved_market_mappings"),
+        str(checkpoints / "silver_unresolved_market_mappings"),
+        "agrishock-silver-unresolved-market-mappings", ["source"],
+    ))
     shocks = weather_shocks(weather, district_boundaries).unionByName(flood_shocks(flood, district_boundaries))
     associations = join_shocks_to_prices(shocks, canonical_prices, ShockJoinPolicy(settings.shock_lookahead_days))
-    queries.append(write_delta(associations, str(root / "gold" / "shock_price_associations"), str(checkpoints / "gold_associations"), "agrishock-gold-associations"))
+    queries.append(write_delta(
+        associations, str(root / "gold" / "shock_price_associations"),
+        str(checkpoints / "gold_associations"), "agrishock-gold-associations",
+        ["shock_type"],
+    ))
     return queries
 
 

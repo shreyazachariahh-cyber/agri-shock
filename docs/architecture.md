@@ -8,6 +8,9 @@ Spark Structured Streaming will perform the event-time transformations; it is
 not replaced by pandas. Delta retains raw-to-analytical lineage, while
 Elasticsearch serves the dashboard.
 
+The concrete Bronze → Silver → Gold paths, keys, replay rules, and serving
+boundary are defined in [the medallion architecture](medallion-architecture.md).
+
 ## Geographic normalization
 
 `geography_dim` will hold canonical state/district IDs, aliases, validity

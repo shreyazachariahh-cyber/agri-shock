@@ -30,16 +30,24 @@ REQUIRED_FIELDS = frozenset(
         "data_confidence",
     }
 )
-VALID_FIXTURE_KINDS = frozenset({"replayed_historical", "synthetic_demo"})
+VALID_FIXTURE_KINDS = frozenset(
+    {"real_source", "replayed_historical", "synthetic_demo"}
+)
 
 INDEX_TEMPLATE: dict[str, Any] = {
-    "index_patterns": ["agrishock-market-shock-signals-*"] ,
+    "index_patterns": ["agrishock-market-shock-signals-*"],
     "template": {
         "settings": {"number_of_shards": 1, "number_of_replicas": 0},
         "mappings": {
             "dynamic": "strict",
             "properties": {
                 "signal_id": {"type": "keyword"},
+                "shock_id": {"type": "keyword"},
+                "price_event_id": {"type": "keyword"},
+                "state_id": {"type": "keyword"},
+                "district_id": {"type": "keyword"},
+                "market_id": {"type": "keyword"},
+                "commodity_id": {"type": "keyword"},
                 "scenario_id": {"type": "keyword"},
                 "fixture_kind": {"type": "keyword"},
                 "state": {"type": "keyword"},
@@ -51,11 +59,15 @@ INDEX_TEMPLATE: dict[str, Any] = {
                 "price_event_time": {"type": "date"},
                 "event_time": {"type": "date"},
                 "ingestion_time": {"type": "date"},
+                "processing_time": {"type": "date"},
+                "model_contract_version": {"type": "keyword"},
                 "location": {"type": "geo_point"},
                 "observed_price": {"type": "double"},
                 "baseline_price": {"type": "double"},
                 "deviation_pct": {"type": "double"},
                 "robust_z_score": {"type": "double"},
+                "days_after_shock": {"type": "integer"},
+                "shock_severity": {"type": "double"},
                 "control_difference_pct": {"type": "double"},
                 "signal_strength": {"type": "double"},
                 "signal_level": {"type": "keyword"},
@@ -67,6 +79,7 @@ INDEX_TEMPLATE: dict[str, Any] = {
                         "reasons": {"type": "keyword"},
                     }
                 },
+                "confidence_reasons": {"type": "keyword"},
                 "source_references": {"type": "keyword"},
                 "scenario_note": {"type": "text"},
             },
@@ -82,7 +95,9 @@ def validate_document(document: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError(f"signal document missing required fields: {sorted(missing)}")
     normalized = dict(document)
     if normalized["fixture_kind"] not in VALID_FIXTURE_KINDS:
-        raise ValueError("fixture_kind must be replayed_historical or synthetic_demo")
+        raise ValueError(
+            "fixture_kind must be real_source, replayed_historical, or synthetic_demo"
+        )
     if normalized["signal_level"] not in {
         "LOW",
         "MEDIUM",
@@ -115,6 +130,18 @@ def read_ndjson(path: Path) -> list[dict[str, Any]]:
     return documents
 
 
+def deduplicate_documents(documents: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse identical replay records; reject contradictory same-ID records."""
+    unique: dict[str, dict[str, Any]] = {}
+    for document in documents:
+        validated = validate_document(document)
+        existing = unique.get(validated["signal_id"])
+        if existing is not None and existing != validated:
+            raise ValueError("conflicting documents share one signal_id")
+        unique[validated["signal_id"]] = validated
+    return list(unique.values())
+
+
 def ensure_index(client: Any, index_name: str = INDEX_NAME) -> None:
     """Create the versioned index once, using the repository mapping."""
     if not client.indices.exists(index=index_name):
@@ -133,8 +160,7 @@ def index_documents(
 ) -> int:
     """Index by stable signal ID, making replays idempotent at this boundary."""
     operations: list[dict[str, Any]] = []
-    for document in documents:
-        validated = validate_document(document)
+    for validated in deduplicate_documents(documents):
         operations.append({"index": {"_index": index_name, "_id": validated["signal_id"]}})
         operations.append(validated)
     if not operations:
