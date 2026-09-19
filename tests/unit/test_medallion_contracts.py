@@ -10,6 +10,7 @@ from agri_shock.storage.medallion import (
     BronzeEvent,
     GoldSignalContext,
     GOLD_SIGNAL_DELTA_COLUMNS,
+    GOLD_SIGNAL_DOUBLE_COLUMNS,
     GOLD_SIGNAL_NULLABLE_COLUMNS,
     SilverMandiObservation,
     build_gold_signal,
@@ -145,6 +146,47 @@ def test_gold_delta_row_preserves_intentional_null_analytics_for_explicit_schema
     assert row["data_confidence"]["reasons"] == ["insufficient_history"]
     assert row["shock_time"] == NOW - timedelta(days=1)
     assert row["processing_time"] == NOW
+
+
+def test_gold_delta_row_normalizes_integer_numeric_values_for_spark_double_fields() -> None:
+    """Regression for live smoke's integer observed_price=800 failure."""
+    integer_location_context = GoldSignalContext(
+        shock_id="smoke-weather-dhemaji-2024-06-30",
+        price_event_id="smoke-mandi-dhemaji-rice-2024-07-01",
+        state_id="IN.AS",
+        district_id="IN.AS.DHEMAJI",
+        market_id="IN.AS.DHEMAJI.M1",
+        commodity_id="RICE",
+        shock_type="rainfall_anomaly",
+        shock_time=NOW - timedelta(days=1),
+        price_event_time=NOW,
+        provenance_type="synthetic_demo",
+        source_references=("synthetic-smoke",),
+        processing_time=NOW,
+        location={"lat": 27, "lon": 94},
+    )
+    integer_evidence = ShockEvidence(
+        "IN.AS.DHEMAJI", "RICE", "rainfall_anomaly", 1, 800, 1000, -20, -2, 1, -12
+    )
+    integer_signal = MarketShockSignal(
+        80,
+        "HIGH",
+        {"price_decline": 20, "control_difference": 12},
+        DataConfidence(1, True, ()),
+    )
+
+    row = gold_signal_delta_row(
+        build_gold_signal(integer_location_context, integer_evidence, integer_signal).to_document()
+    )
+
+    for column in GOLD_SIGNAL_DOUBLE_COLUMNS:
+        assert row[column] is None or isinstance(row[column], float)
+    assert row["observed_price"] == 800.0
+    assert row["baseline_price"] == 1000.0
+    assert row["location"] == {"lat": 27.0, "lon": 94.0}
+    assert row["component_scores"] == {"price_decline": 20.0, "control_difference": 12.0}
+    assert row["data_confidence"]["value"] == 1.0
+    assert isinstance(row["days_after_shock"], int)
 
 
 def test_late_event_is_preserved_for_reconciliation_not_silently_dropped() -> None:

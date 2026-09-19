@@ -69,6 +69,9 @@ Elasticsearch indexer; there is no separate dashboard schema.
 Gold Delta materialization uses an explicit `StructType` for this contract.
 This preserves legitimate null analytical values and typed empty confidence
 reason arrays; a one-row replay must never rely on Spark schema inference.
+Before the row reaches Spark, compatible Python integers, floats, and decimals
+are normalized to the declared `DoubleType` fields, including numeric maps and
+nested confidence values. Integral fields remain integral.
 
 ## Delta semantics, checkpoints, and corrections
 

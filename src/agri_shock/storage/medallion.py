@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from hashlib import sha256
+from math import isfinite
+from numbers import Real
 from typing import Any, Mapping
 
 from agri_shock.processing.confidence import DataConfidence
@@ -65,6 +68,17 @@ GOLD_SIGNAL_NULLABLE_COLUMNS = frozenset(
         "signal_strength",
     }
 )
+
+GOLD_SIGNAL_DOUBLE_COLUMNS = (
+    "observed_price",
+    "baseline_price",
+    "deviation_pct",
+    "robust_z_score",
+    "shock_severity",
+    "control_difference_pct",
+    "signal_strength",
+)
+GOLD_SIGNAL_INTEGER_COLUMNS = ("days_after_shock",)
 
 
 def _utc(value: datetime, field_name: str) -> datetime:
@@ -269,6 +283,54 @@ def _parse_document_timestamp(value: str, field_name: str) -> datetime:
     return _utc(parsed, field_name)
 
 
+def _as_double(value: Any, field_name: str) -> float | None:
+    """Convert legitimate source numerics to Spark DoubleType values."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (Real, Decimal)):
+        raise ValueError(f"Gold document {field_name} must be numeric or null")
+    normalized = float(value)
+    if not isfinite(normalized):
+        raise ValueError(f"Gold document {field_name} must be finite")
+    return normalized
+
+
+def _as_integral(value: Any, field_name: str) -> int | None:
+    """Accept integral numeric values without silently truncating fractions."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (Real, Decimal)):
+        raise ValueError(f"Gold document {field_name} must be integral or null")
+    if not isfinite(float(value)):
+        raise ValueError(f"Gold document {field_name} must be finite")
+    normalized = int(value)
+    if value != normalized:
+        raise ValueError(f"Gold document {field_name} must not contain a fractional value")
+    return normalized
+
+
+def _as_double_map(value: Any, field_name: str) -> dict[str, float] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError(f"Gold document {field_name} must be a string-to-number map or null")
+    normalized: dict[str, float] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValueError(f"Gold document {field_name} keys must be strings")
+        number = _as_double(item, f"{field_name}.{key}")
+        if number is None:
+            raise ValueError(f"Gold document {field_name}.{key} must not be null")
+        normalized[key] = number
+    return normalized
+
+
+def _as_string_array(value: Any, field_name: str) -> list[str]:
+    if not isinstance(value, (list, tuple)) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Gold document {field_name} must be an array of strings")
+    return list(value)
+
+
 def gold_signal_delta_row(document: Mapping[str, Any]) -> dict[str, Any]:
     """Convert the serving document to typed Delta values without changing nulls.
 
@@ -282,6 +344,31 @@ def gold_signal_delta_row(document: Mapping[str, Any]) -> dict[str, Any]:
     row = {column: document[column] for column in GOLD_SIGNAL_DELTA_COLUMNS}
     for column in ("shock_time", "price_event_time", "event_time", "ingestion_time", "processing_time"):
         row[column] = _parse_document_timestamp(row[column], column)
+    for column in GOLD_SIGNAL_DOUBLE_COLUMNS:
+        row[column] = _as_double(row[column], column)
+    for column in GOLD_SIGNAL_INTEGER_COLUMNS:
+        row[column] = _as_integral(row[column], column)
+    row["location"] = _as_double_map(row["location"], "location")
+    component_scores = _as_double_map(row["component_scores"], "component_scores")
+    if component_scores is None:
+        raise ValueError("Gold document component_scores must not be null")
+    row["component_scores"] = component_scores
+    confidence = row["data_confidence"]
+    if not isinstance(confidence, Mapping):
+        raise ValueError("Gold document data_confidence must be an object")
+    confidence_value = _as_double(confidence.get("value"), "data_confidence.value")
+    if confidence_value is None:
+        raise ValueError("Gold document data_confidence.value must not be null")
+    confidence_sufficient = confidence.get("is_sufficient")
+    if not isinstance(confidence_sufficient, bool):
+        raise ValueError("Gold document data_confidence.is_sufficient must be boolean")
+    row["data_confidence"] = {
+        "value": confidence_value,
+        "is_sufficient": confidence_sufficient,
+        "reasons": _as_string_array(confidence.get("reasons"), "data_confidence.reasons"),
+    }
+    row["confidence_reasons"] = _as_string_array(row["confidence_reasons"], "confidence_reasons")
+    row["source_references"] = _as_string_array(row["source_references"], "source_references")
     return row
 
 
