@@ -31,6 +31,8 @@ rather than being invented.
 | `silver/weather_events` | source `event_id` | `event_time` | canonical district lookup outcome, IMD attributes, Kafka coordinates, source/schema version |
 | `silver/flood_events` | source `event_id` | `event_time` / event start | source event ID, geometry, alert metadata, Kafka coordinates, source/schema version |
 | `silver/unresolved_market_mappings` | source `event_id` | `event_time` | unresolved source market fields and Kafka/source provenance for reference-data remediation |
+| `silver/unresolved_weather_mappings` | source `event_id` | `event_time` | unmatched source district, `district_reference_not_found`, and Kafka/source provenance |
+| `silver/unresolved_flood_mappings` | source `event_id` | `event_time` | missing/non-intersecting geometry reason and Kafka/source provenance |
 | reference dimensions | versioned source keys | validity interval | canonical IDs, aliases/boundary or mapping version, source provenance |
 
 Source-specific schemas are explicit. Invalid JSON, invalid timestamps,

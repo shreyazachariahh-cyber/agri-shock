@@ -193,3 +193,9 @@ def test_late_event_is_preserved_for_reconciliation_not_silently_dropped() -> No
     cutoff = NOW - timedelta(hours=24)
     assert late_event_disposition(NOW - timedelta(hours=25), cutoff) == "reconcile"
     assert late_event_disposition(cutoff, cutoff) == "process"
+
+
+def test_late_event_contract_distinguishes_within_and_beyond_72_hour_watermark() -> None:
+    cutoff = NOW - timedelta(hours=72)
+    assert late_event_disposition(NOW - timedelta(hours=71), cutoff) == "process"
+    assert late_event_disposition(NOW - timedelta(hours=73), cutoff) == "reconcile"

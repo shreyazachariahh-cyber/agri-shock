@@ -14,7 +14,47 @@ def canonicalize_markets(prices: Any, market_dimension: Any) -> Any:
     return (normalized.join(reference, ["_source_state", "_source_district", "_source_market"], "left")
         .drop("_source_state", "_source_district", "_source_market")
         .withColumn("commodity_id", F.sha2(F.upper(F.trim("commodity")), 256))
-        .withColumn("mapping_status", F.when(F.col("market_id").isNull(), F.lit("unresolved")).otherwise(F.lit("resolved"))))
+        .withColumn("mapping_status", F.when(F.col("market_id").isNull(), F.lit("unresolved")).otherwise(F.lit("resolved")))
+        .withColumn("mapping_reason", F.when(F.col("market_id").isNull(), F.lit("market_reference_not_found"))))
+
+
+def unresolved_weather_mappings(weather: Any, district_boundaries: Any) -> Any:
+    """Retain weather observations whose district cannot be canonically mapped."""
+    from pyspark.sql import functions as F
+    reference = district_boundaries.select(
+        "district_id",
+        F.upper(F.trim("source_state")).alias("_source_state"),
+        F.upper(F.trim("source_district")).alias("_source_district"),
+    )
+    observations = weather.select(
+        "*",
+        F.upper(F.trim("state")).alias("_source_state"),
+        F.upper(F.trim("district")).alias("_source_district"),
+    )
+    return (observations.join(reference, ["_source_state", "_source_district"], "left")
+        .filter(F.col("district_id").isNull())
+        .drop("district_id", "_source_state", "_source_district")
+        .withColumn("mapping_status", F.lit("unresolved"))
+        .withColumn("mapping_reason", F.lit("district_reference_not_found")))
+
+
+def unresolved_flood_mappings(floods: Any, district_boundaries: Any) -> Any:
+    """Retain missing or non-intersecting flood geometries for remediation."""
+    from pyspark.sql import functions as F
+    missing_geometry = (floods.filter(F.col("geometry_json").isNull())
+        .withColumn("mapping_status", F.lit("unresolved"))
+        .withColumn("mapping_reason", F.lit("missing_flood_geometry")))
+    districts = district_boundaries.select(
+        "district_id", F.expr("ST_GeomFromGeoJSON(geometry_json)").alias("_district_geometry")
+    )
+    unmatched = (floods.filter(F.col("geometry_json").isNotNull())
+        .withColumn("_flood_geometry", F.expr("ST_GeomFromGeoJSON(geometry_json)"))
+        .join(districts, F.expr("ST_Intersects(_flood_geometry, _district_geometry)"), "left")
+        .filter(F.col("district_id").isNull())
+        .drop("district_id", "_flood_geometry", "_district_geometry")
+        .withColumn("mapping_status", F.lit("unresolved"))
+        .withColumn("mapping_reason", F.lit("flood_geometry_did_not_intersect_reference")))
+    return missing_geometry.unionByName(unmatched, allowMissingColumns=True)
 
 def flood_shocks(floods: Any, district_boundaries: Any) -> Any:
     """Spatially associate GeoJSON flood geometry to canonical districts."""

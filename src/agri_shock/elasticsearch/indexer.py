@@ -7,10 +7,12 @@ required only by the command-line delivery path.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
+import time
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 INDEX_NAME = "agrishock-market-shock-signals-v1"
@@ -33,6 +35,20 @@ REQUIRED_FIELDS = frozenset(
 VALID_FIXTURE_KINDS = frozenset(
     {"real_source", "replayed_historical", "synthetic_demo"}
 )
+
+
+class ElasticsearchDeliveryError(RuntimeError):
+    """An Elasticsearch delivery failure that callers must surface."""
+
+
+@dataclass(frozen=True, slots=True)
+class ElasticsearchRetryPolicy:
+    max_attempts: int = 3
+    initial_backoff_seconds: float = 0.25
+
+    def __post_init__(self) -> None:
+        if self.max_attempts < 1 or self.initial_backoff_seconds < 0:
+            raise ValueError("Elasticsearch retry policy values are invalid")
 
 INDEX_TEMPLATE: dict[str, Any] = {
     "index_patterns": ["agrishock-market-shock-signals-*"],
@@ -153,22 +169,47 @@ def ensure_index(client: Any, index_name: str = INDEX_NAME) -> None:
         )
 
 
+def _response_is_retriable(response: Mapping[str, Any]) -> bool:
+    statuses = [
+        item["index"].get("status")
+        for item in response.get("items", [])
+        if isinstance(item, Mapping) and isinstance(item.get("index"), Mapping)
+    ]
+    return bool(statuses) and all(status == 429 or isinstance(status, int) and status >= 500 for status in statuses)
+
+
+def _exception_is_retriable(error: Exception) -> bool:
+    status = getattr(error, "status_code", None)
+    return isinstance(error, (TimeoutError, ConnectionError, OSError)) or status == 429 or isinstance(status, int) and status >= 500
+
+
 def index_documents(
     client: Any,
     documents: Iterable[Mapping[str, Any]],
     index_name: str = INDEX_NAME,
+    retry_policy: ElasticsearchRetryPolicy = ElasticsearchRetryPolicy(),
+    sleep: Callable[[float], None] = time.sleep,
 ) -> int:
-    """Index by stable signal ID, making replays idempotent at this boundary."""
+    """Index by stable signal ID; retry only transient delivery failures."""
     operations: list[dict[str, Any]] = []
     for validated in deduplicate_documents(documents):
         operations.append({"index": {"_index": index_name, "_id": validated["signal_id"]}})
         operations.append(validated)
     if not operations:
         return 0
-    response = client.bulk(operations=operations, refresh="wait_for")
-    if response.get("errors"):
-        raise RuntimeError("Elasticsearch bulk request reported item failures")
-    return len(operations) // 2
+    for attempt in range(1, retry_policy.max_attempts + 1):
+        try:
+            response = client.bulk(operations=operations, refresh="wait_for")
+        except Exception as error:
+            if not _exception_is_retriable(error) or attempt == retry_policy.max_attempts:
+                raise ElasticsearchDeliveryError("Elasticsearch bulk request failed") from error
+        else:
+            if not response.get("errors"):
+                return len(operations) // 2
+            if not _response_is_retriable(response) or attempt == retry_policy.max_attempts:
+                raise ElasticsearchDeliveryError("Elasticsearch bulk request reported permanent item failures")
+        sleep(retry_policy.initial_backoff_seconds * 2 ** (attempt - 1))
+    raise AssertionError("Elasticsearch retry loop exited unexpectedly")
 
 
 def main() -> None:

@@ -8,4 +8,14 @@ def test_point_maps_to_canonical_district() -> None:
 
 def test_unmapped_point_is_not_name_matched() -> None:
     boundary = DistrictBoundary("IN.MH.NASHIK", "IN.MH", "gsi-2025", ((73, 19), (75, 19), (75, 21), (73, 21)))
-    assert map_point_to_district((80, 20), [boundary]).district_id is None
+    result = map_point_to_district((80, 20), [boundary])
+    assert result.district_id is None
+    assert result.method == "unresolved"
+
+
+def test_ambiguous_reference_mapping_is_not_guessed() -> None:
+    first = DistrictBoundary("IN.MH.NASHIK", "IN.MH", "gsi-2025", ((73, 19), (75, 19), (75, 21), (73, 21)))
+    second = DistrictBoundary("IN.MH.AHMEDNAGAR", "IN.MH", "gsi-2025", ((73, 19), (75, 19), (75, 21), (73, 21)))
+    result = map_point_to_district((74, 20), [first, second])
+    assert result.district_id is None
+    assert result.method == "ambiguous"

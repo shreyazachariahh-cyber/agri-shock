@@ -13,9 +13,10 @@ not causation.
 
 ## Status
 
-Phase 7 recruiter demo assets and Elasticsearch delivery contract are complete.
-Docker is not installed on this host, so Docker, Kafka, Spark, Elasticsearch,
-and Kibana have not been run here.
+Phase 9 was live-validated in WSL2 with Docker Kafka, Spark Structured
+Streaming, Delta, Elasticsearch, and Kibana. Phase 10 adds replay, DLQ,
+retry, checkpoint, and reference-remediation contracts. The public-source case
+study remains intentionally unselected until source coverage is verified.
 See [data-source feasibility](docs/data-sources.md).
 
 ## Architecture
@@ -38,6 +39,7 @@ not a substitute for source-attributed records.
 
 The physical Delta lineage, deterministic keys, replay behavior, and schema
 evolution policy are described in [the medallion architecture](docs/medallion-architecture.md).
+Detailed guarantees and limitations are in [reliability and replay](docs/reliability-and-replay.md).
 
 ## Local runtime validation
 
@@ -92,6 +94,7 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Kibana dashboard specification](dashboards/kibana/README.md)
 - [Delta medallion architecture](docs/medallion-architecture.md)
 - [Windows runtime validation](docs/runtime-validation.md)
+- [Reliability and replay](docs/reliability-and-replay.md)
 - [Limitations](docs/limitations.md)
 
 ## License

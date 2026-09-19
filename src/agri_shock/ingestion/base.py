@@ -48,7 +48,7 @@ class ProducerBase:
                 self._publish_with_retry(self.topic, partition_key(event), event)
                 published += 1
             except Exception as error:
-                self._route_dlq(event, stage="publish", reason=str(error))
+                self._route_dlq(event, stage="publish", reason=str(error), source_topic=self.topic)
                 rejected += 1
         return ProducerReport(published, rejected)
 
@@ -62,17 +62,28 @@ class ProducerBase:
                     raise
                 self.sleep(self.retry_policy.initial_backoff_seconds * 2 ** (attempt - 1))
 
-    def _route_dlq(self, event: EventEnvelope, stage: str, reason: str) -> None:
+    def _route_dlq(self, event: EventEnvelope, stage: str, reason: str, source_topic: str) -> None:
         dlq = EventEnvelope(
             event_id=f"dlq:{event.event_id}:{stage}", event_type="dead_letter_event",
             event_time=event.event_time, ingestion_time=datetime.now(timezone.utc),
             source="agrishock", schema_version="1.0",
-            payload={"reason": reason, "stage": stage, "original_event_id": event.event_id, "original_event_type": event.event_type},
+            payload={
+                "reason": reason,
+                "stage": stage,
+                "original_event_id": event.event_id,
+                "original_event_type": event.event_type,
+                "original_source": event.source,
+                "original_event_time": event.event_time.isoformat(),
+                "source_topic": source_topic,
+                "original_payload": dict(event.payload),
+                "processing_time": datetime.now(timezone.utc).isoformat(),
+            },
         )
         try:
-            self.publisher.publish(self.dlq_topic, event.event_id, dlq)
-        except Exception:
+            self._publish_with_retry(self.dlq_topic, event.event_id, dlq)
+        except Exception as error:
             LOGGER.exception("dead-letter publication failed", extra={"event_id": event.event_id, "stage": stage})
+            raise RuntimeError(f"dead-letter publication failed for {event.event_id}") from error
 
     def reject_raw(self, source: str, event_type: str, raw_record: object, reason: str) -> None:
         """Preserve malformed input in the DLQ instead of silently discarding it."""
@@ -82,4 +93,4 @@ class ProducerBase:
             event_type=event_type, event_time=datetime.now(timezone.utc), ingestion_time=datetime.now(timezone.utc),
             source=source, schema_version="1.0", payload={"raw_record": raw_record},
         )
-        self._route_dlq(rejected, stage="normalize", reason=reason)
+        self._route_dlq(rejected, stage="normalize", reason=reason, source_topic=self.topic)

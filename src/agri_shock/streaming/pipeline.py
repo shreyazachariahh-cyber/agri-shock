@@ -52,9 +52,15 @@ def parse_mandi(kafka_df: Any, policy: EventTimePolicy) -> tuple[Any, Any]:
     from pyspark.sql.types import DecimalType, StringType, StructField, StructType
     payload = StructType([StructField("state", StringType()), StructField("district", StringType()), StructField("market", StringType()), StructField("commodity", StringType()), StructField("variety", StringType()), StructField("min_price", DecimalType(18, 2)), StructField("modal_price", DecimalType(18, 2)), StructField("max_price", DecimalType(18, 2)), StructField("price_unit", StringType())])
     schema = StructType([StructField("event_id", StringType()), StructField("event_type", StringType()), StructField("event_time", StringType()), StructField("ingestion_time", StringType()), StructField("source", StringType()), StructField("schema_version", StringType()), StructField("payload", payload)])
-    parsed = kafka_df.select("*", F.from_json("raw_json", schema).alias("event")).select("kafka_key", "raw_json", "topic", "partition", "offset", "kafka_timestamp", "event.*").withColumn("event_time", F.to_timestamp("event_time")).withColumn("ingestion_time", F.to_timestamp("ingestion_time"))
+    parsed = kafka_df.select("*", F.from_json("raw_json", schema).alias("event")).select("kafka_key", "raw_json", "topic", "partition", "offset", "kafka_timestamp", F.col("event").isNull().alias("_malformed_json"), "event.*").withColumn("event_time", F.to_timestamp("event_time")).withColumn("ingestion_time", F.to_timestamp("ingestion_time"))
     valid_rule = (F.col("event_id").isNotNull() & F.col("event_time").isNotNull() & (F.length(F.trim("payload.district")) > 0) & (F.length(F.trim("payload.market")) > 0) & (F.length(F.trim("payload.commodity")) > 0) & (F.col("payload.min_price") >= 0) & (F.col("payload.min_price") <= F.col("payload.modal_price")) & (F.col("payload.modal_price") <= F.col("payload.max_price")))
-    invalid = parsed.filter(~valid_rule)
+    invalid = parsed.filter(~valid_rule).withColumn(
+        "_dlq_reason",
+        F.when(F.col("_malformed_json"), F.lit("malformed_json"))
+        .when(F.col("event_id").isNull(), F.lit("missing_event_id"))
+        .when(F.col("event_time").isNull(), F.lit("invalid_event_time"))
+        .otherwise(F.lit("mandi_schema_or_price_validation_failed")),
+    )
     valid = (parsed.filter(valid_rule).withWatermark("event_time", policy.spark_duration).dropDuplicates(["event_id"]).select(
         "event_id", "event_time", "ingestion_time", "source", "schema_version",
         F.col("topic").alias("kafka_topic"), F.col("partition").alias("kafka_partition"),

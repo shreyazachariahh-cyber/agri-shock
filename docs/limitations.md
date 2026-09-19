@@ -7,8 +7,10 @@
 - Administrative boundaries and names change; mappings have temporal validity.
 - Mandi data is commonly daily, so live ingestion does not imply intraday price
   discovery.
-- Docker services are declared but unverified locally because Docker is absent.
+- The local WSL2 synthetic smoke workflow was live-validated, but this is not
+  equivalent to a production-scale availability, load, or disaster-recovery test.
 - The Phase 7 multi-state dashboard fixture is synthetic; event-context labels
   do not validate any listed market, coordinate, price, anomaly, or signal.
-- Elasticsearch indexing has unit coverage but no live cluster integration
-  verification on this host.
+- Elasticsearch indexing was live-validated for the deterministic synthetic
+  smoke signal; public-source throughput and failure-rate behavior remain
+  unmeasured.

@@ -80,15 +80,17 @@ def verify_delta_content(paths: SmokePaths) -> None:
     spark = create_smoke_delta_spark("agrishock-smoke-verify")
     try:
         checks = (
-            (paths.delta_root / "bronze" / "raw_events", "source_event_id", SMOKE_PRICE_EVENT_ID, "Bronze mandi event"),
-            (paths.delta_root / "silver" / "mandi_prices", "event_id", SMOKE_PRICE_EVENT_ID, "Silver mandi event"),
-            (paths.delta_root / "silver" / "weather_events", "event_id", SMOKE_SHOCK_ID, "Silver weather event"),
-            (paths.delta_root / "gold" / "shock_price_associations", "price_event_id", SMOKE_PRICE_EVENT_ID, "Gold association"),
-            (paths.delta_root / "gold" / "market_shock_signals", "signal_id", expected_signal_id(), "Gold signal"),
+            (paths.delta_root / "bronze" / "raw_events", "source_event_id", SMOKE_PRICE_EVENT_ID, "Bronze mandi event", False),
+            (paths.delta_root / "silver" / "mandi_prices", "event_id", SMOKE_PRICE_EVENT_ID, "Silver mandi event", True),
+            (paths.delta_root / "silver" / "weather_events", "event_id", SMOKE_SHOCK_ID, "Silver weather event", True),
+            (paths.delta_root / "gold" / "shock_price_associations", "price_event_id", SMOKE_PRICE_EVENT_ID, "Gold association", True),
+            (paths.delta_root / "gold" / "market_shock_signals", "signal_id", expected_signal_id(), "Gold signal", True),
         )
-        for path, column, expected, label in checks:
-            if spark.read.format("delta").load(str(path)).filter(f"{column} = '{expected}'").limit(1).count() != 1:
-                raise RuntimeError(f"smoke test incomplete; expected {label} was not found")
+        for path, column, expected, label, must_be_unique in checks:
+            matches = spark.read.format("delta").load(str(path)).filter(f"{column} = '{expected}'").limit(2).count()
+            if matches < 1 or must_be_unique and matches != 1:
+                expected_count = "exactly one" if must_be_unique else "at least one"
+                raise RuntimeError(f"smoke test incomplete; expected {expected_count} {label}, found {matches}")
     finally:
         spark.stop()
 

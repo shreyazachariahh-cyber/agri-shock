@@ -39,7 +39,15 @@ class KafkaJsonPublisher:
             from confluent_kafka import Producer  # type: ignore[import-not-found]
         except ImportError as error:
             raise RuntimeError("Install the kafka extra to use KafkaJsonPublisher") from error
-        self._producer = Producer({"bootstrap.servers": bootstrap_servers, "enable.idempotence": True})
+        self._producer = Producer(
+            {
+                "bootstrap.servers": bootstrap_servers,
+                "enable.idempotence": True,
+                "acks": "all",
+                "retries": 3,
+                "delivery.timeout.ms": 30000,
+            }
+        )
 
     def publish(self, topic: str, key: str, event: EventEnvelope) -> None:
         delivered: list[Exception] = []

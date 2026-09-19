@@ -13,7 +13,13 @@ from agri_shock.common.config import Settings
 from agri_shock.common.logging import configure_logging
 from agri_shock.streaming.contracts import EventTimePolicy
 from agri_shock.streaming.pipeline import bronze_events, kafka_input, parse_mandi, write_delta
-from agri_shock.geospatial.spark import canonicalize_markets, flood_shocks, weather_shocks
+from agri_shock.geospatial.spark import (
+    canonicalize_markets,
+    flood_shocks,
+    unresolved_flood_mappings,
+    unresolved_weather_mappings,
+    weather_shocks,
+)
 from agri_shock.streaming.joins import ShockJoinPolicy, join_shocks_to_prices
 
 KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.6"
@@ -76,13 +82,19 @@ def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fiel
         StructField("payload", payload_schema),
     ])
     parsed = (kafka_df.select("*", F.from_json("raw_json", schema).alias("event"))
-        .select("kafka_key", "raw_json", "topic", "partition", "offset", "kafka_timestamp", "event.*")
+        .select("kafka_key", "raw_json", "topic", "partition", "offset", "kafka_timestamp", F.col("event").isNull().alias("_malformed_json"), "event.*")
         .withColumn("event_time", F.to_timestamp("event_time"))
         .withColumn("ingestion_time", F.to_timestamp("ingestion_time")))
     valid = F.col("event_id").isNotNull() & F.col("event_time").isNotNull()
     for field in required_payload_fields:
         valid = valid & (F.length(F.trim(F.col(f"payload.{field}"))) > 0)
-    invalid = parsed.filter(~valid)
+    invalid = parsed.filter(~valid).withColumn(
+        "_dlq_reason",
+        F.when(F.col("_malformed_json"), F.lit("malformed_json"))
+        .when(F.col("event_id").isNull(), F.lit("missing_event_id"))
+        .when(F.col("event_time").isNull(), F.lit("invalid_event_time"))
+        .otherwise(F.lit("required_payload_missing_or_invalid")),
+    )
     return (parsed.filter(valid).withWatermark("event_time", policy.spark_duration)
         .dropDuplicates(["event_id"]).select(
             "event_id", "event_time", "ingestion_time", "source", "schema_version",
@@ -95,10 +107,19 @@ def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fiel
 def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> Any:
     from pyspark.sql import functions as F
     envelope = invalid_stream.select(
-        F.sha2("raw_json", 256).alias("event_id"), F.lit("dead_letter_event").alias("event_type"),
+        F.concat(F.lit("dlq:"), F.sha2(F.concat_ws("|", "topic", F.col("partition").cast("string"), F.col("offset").cast("string"), "raw_json"), 256)).alias("event_id"), F.lit("dead_letter_event").alias("event_type"),
         F.coalesce("event_time", "kafka_timestamp").alias("event_time"), F.current_timestamp().alias("ingestion_time"),
         F.lit("agrishock_spark").alias("source"), F.lit("1.0").alias("schema_version"),
-        F.struct(F.lit("spark_validation").alias("stage"), F.lit("schema_or_semantic_validation_failed").alias("reason"), "raw_json", "topic", "partition", "offset").alias("payload"),
+        F.struct(
+            F.lit("spark_validation").alias("stage"),
+            F.coalesce(F.col("_dlq_reason"), F.lit("schema_or_semantic_validation_failed")).alias("reason"),
+            F.col("raw_json").alias("original_payload"),
+            F.col("topic").alias("source_topic"),
+            F.col("partition").alias("source_partition"),
+            F.col("offset").alias("source_offset"),
+            F.col("kafka_timestamp").alias("kafka_timestamp"),
+            F.current_timestamp().alias("processing_time"),
+        ).alias("payload"),
     ).selectExpr("CAST(event_id AS STRING) AS key", "to_json(struct(*)) AS value")
     return (envelope.writeStream.format("kafka").option("kafka.bootstrap.servers", settings.kafka_bootstrap_servers)
         .option("topic", "dead-letter-events").option("checkpointLocation", checkpoint_path).outputMode("append").queryName("agrishock-dlq").start())
@@ -147,6 +168,18 @@ def start_application(settings: Settings) -> list[Any]:
         unresolved_markets, str(root / "silver" / "unresolved_market_mappings"),
         str(checkpoints / "silver_unresolved_market_mappings"),
         "agrishock-silver-unresolved-market-mappings", ["source"],
+    ))
+    queries.append(write_delta(
+        unresolved_weather_mappings(weather, district_boundaries),
+        str(root / "silver" / "unresolved_weather_mappings"),
+        str(checkpoints / "silver_unresolved_weather_mappings"),
+        "agrishock-silver-unresolved-weather-mappings", ["source"],
+    ))
+    queries.append(write_delta(
+        unresolved_flood_mappings(flood, district_boundaries),
+        str(root / "silver" / "unresolved_flood_mappings"),
+        str(checkpoints / "silver_unresolved_flood_mappings"),
+        "agrishock-silver-unresolved-flood-mappings", ["source"],
     ))
     shocks = weather_shocks(weather, district_boundaries).unionByName(flood_shocks(flood, district_boundaries))
     associations = join_shocks_to_prices(shocks, canonical_prices, ShockJoinPolicy(settings.shock_lookahead_days))

@@ -1,6 +1,8 @@
 from agri_shock.ingestion.base import RetryPolicy
 from agri_shock.ingestion.mandi_producer import MandiProducer
-from agri_shock.ingestion.publisher import MemoryPublisher
+from agri_shock.ingestion.publisher import KafkaJsonPublisher, MemoryPublisher
+from types import SimpleNamespace
+import sys
 
 
 def valid_record() -> dict[str, object]:
@@ -18,3 +20,17 @@ def test_publish_retries() -> None:
     publisher = MemoryPublisher(failures_remaining=1)
     report = MandiProducer(publisher, RetryPolicy(max_attempts=2, initial_backoff_seconds=0)).ingest([valid_record()])
     assert report.published == 1
+
+
+def test_kafka_publisher_enables_idempotent_broker_delivery(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeProducer:
+        def __init__(self, config: dict[str, object]) -> None:
+            captured.update(config)
+
+    monkeypatch.setitem(sys.modules, "confluent_kafka", SimpleNamespace(Producer=FakeProducer))
+    KafkaJsonPublisher("localhost:9092")
+    assert captured["enable.idempotence"] is True
+    assert captured["acks"] == "all"
+    assert captured["retries"] == 3

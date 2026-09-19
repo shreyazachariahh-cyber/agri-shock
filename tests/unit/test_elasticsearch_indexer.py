@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from agri_shock.elasticsearch.indexer import (
+    ElasticsearchDeliveryError,
+    ElasticsearchRetryPolicy,
     INDEX_NAME,
     deduplicate_documents,
     ensure_index,
@@ -73,6 +75,51 @@ def test_identical_replay_records_collapse_but_conflicting_identity_fails() -> N
     assert deduplicate_documents([document(), document()]) == [document()]
     with pytest.raises(ValueError, match="conflicting"):
         deduplicate_documents([document(), document() | {"signal_strength": 70.0}])
+
+
+def test_indexing_retries_transient_delivery_and_reuses_deterministic_id() -> None:
+    class TransientClient(FakeClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def bulk(self, *, operations: list[dict[str, object]], refresh: str) -> dict[str, bool]:
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("temporary Elasticsearch timeout")
+            return super().bulk(operations=operations, refresh=refresh)
+
+    client = TransientClient()
+    assert index_documents(
+        client,
+        [document(), document()],
+        retry_policy=ElasticsearchRetryPolicy(max_attempts=2, initial_backoff_seconds=0),
+        sleep=lambda _: None,
+    ) == 1
+    assert client.calls == 2
+    assert client.operations is not None
+    assert client.operations[0]["index"]["_id"] == "signal-001"
+
+
+def test_indexing_does_not_retry_permanent_bulk_failure() -> None:
+    class PermanentFailureClient(FakeClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def bulk(self, *, operations: list[dict[str, object]], refresh: str) -> dict[str, object]:
+            self.calls += 1
+            return {"errors": True, "items": [{"index": {"status": 400}}]}
+
+    client = PermanentFailureClient()
+    with pytest.raises(ElasticsearchDeliveryError, match="permanent"):
+        index_documents(
+            client,
+            [document()],
+            retry_policy=ElasticsearchRetryPolicy(max_attempts=3, initial_backoff_seconds=0),
+            sleep=lambda _: None,
+        )
+    assert client.calls == 1
 
 
 def test_demo_fixture_is_validated_from_ndjson() -> None:
