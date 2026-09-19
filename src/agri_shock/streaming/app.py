@@ -18,21 +18,51 @@ from agri_shock.streaming.joins import ShockJoinPolicy, join_shocks_to_prices
 
 KAFKA_PACKAGE = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.6"
 SEDONA_PACKAGE = "org.apache.sedona:sedona-spark-shaded-3.5_2.12:1.9.0"
+SMOKE_DELTA_SPARK_OPTIONS = {
+    "spark.sql.shuffle.partitions": "1",
+    "spark.default.parallelism": "1",
+    "spark.ui.enabled": "false",
+}
+
+
+def _delta_builder(app_name: str) -> Any:
+    try:
+        from pyspark.sql import SparkSession
+    except ImportError as error:
+        raise RuntimeError("Install agri-shock[streaming] in Python 3.11 and configure Java 17") from error
+    return (SparkSession.builder.appName(app_name)
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"))
 
 
 def create_streaming_spark(app_name: str = "agrishock-streaming") -> Any:
     try:
         from delta import configure_spark_with_delta_pip
-        from pyspark.sql import SparkSession
     except ImportError as error:
         raise RuntimeError("Install agri-shock[streaming] in Python 3.11 and configure Java 17") from error
-    builder = (SparkSession.builder.appName(app_name)
-        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"))
+    builder = _delta_builder(app_name)
     spark = configure_spark_with_delta_pip(builder, extra_packages=[KAFKA_PACKAGE, SEDONA_PACKAGE]).getOrCreate()
     from sedona.spark import SedonaContext
     SedonaContext.create(spark)
     return spark
+
+
+def create_smoke_delta_spark(app_name: str) -> Any:
+    """Create a lean, Delta-only local Spark session for bounded smoke stages.
+
+    The smoke materializer reads/writes Delta only.  It must not initialize
+    Kafka or Sedona while a separate structured-streaming process is active.
+    Fixed one-thread/one-partition settings make a one-row MERGE bounded and
+    do not affect the production streaming session.
+    """
+    try:
+        from delta import configure_spark_with_delta_pip
+    except ImportError as error:
+        raise RuntimeError("Install agri-shock[streaming] in Python 3.11 and configure Java 17") from error
+    builder = _delta_builder(app_name).master("local[1]")
+    for key, value in SMOKE_DELTA_SPARK_OPTIONS.items():
+        builder = builder.config(key, value)
+    return configure_spark_with_delta_pip(builder).getOrCreate()
 
 
 def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fields: list[str], policy: EventTimePolicy) -> tuple[Any, Any]:

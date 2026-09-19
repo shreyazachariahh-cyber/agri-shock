@@ -115,6 +115,12 @@ This command refuses to continue unless the expected Gold association exists;
 it uses the existing evaluator, writes a Delta Gold signal with deterministic
 identity, then indexes that exact document into Elasticsearch.
 
+The materialization and verification commands use a separate Delta-only local
+Spark session (`local[1]`, one shuffle partition). They deliberately do not
+load Kafka or Sedona because the active streaming process already owns those
+resources. These smoke-only settings do not change production stream settings
+or Gold semantics.
+
 ```powershell
 python -m agri_shock.runtime.smoke materialize-gold `
   --delta-root $env:DELTA_ROOT `

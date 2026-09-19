@@ -74,10 +74,10 @@ def verify_delta_layout(paths: SmokePaths) -> None:
 
 def verify_delta_content(paths: SmokePaths) -> None:
     """Read Delta tables and require the known synthetic IDs at every stage."""
-    from agri_shock.streaming.app import create_streaming_spark
+    from agri_shock.streaming.app import create_smoke_delta_spark
 
     verify_delta_layout(paths)
-    spark = create_streaming_spark("agrishock-smoke-verify")
+    spark = create_smoke_delta_spark("agrishock-smoke-verify")
     try:
         checks = (
             (paths.delta_root / "bronze" / "raw_events", "source_event_id", SMOKE_PRICE_EVENT_ID, "Bronze mandi event"),
@@ -102,9 +102,9 @@ def verify_elasticsearch_signal(url: str, signal_id: str, fetch: Callable[[str],
 
 def prepare_synthetic_reference_data(market_dimension_path: Path, district_boundary_path: Path) -> None:
     """Create a labelled demo-only reference pair required by the streaming join."""
-    from agri_shock.streaming.app import create_streaming_spark
+    from agri_shock.streaming.app import create_smoke_delta_spark
 
-    spark = create_streaming_spark("agrishock-smoke-reference-data")
+    spark = create_smoke_delta_spark("agrishock-smoke-reference-data")
     try:
         spark.createDataFrame([
             ("IN.AS.DHEMAJI.M1", "IN.AS.DHEMAJI", "IN.AS", "Assam", "Dhemaji", "Dhemaji Demo Mandi"),
@@ -125,12 +125,12 @@ def create_gold_signal_dataframe(spark: Any, document: Mapping[str, Any]) -> Any
 
 def materialize_synthetic_gold(delta_root: Path, elasticsearch_url: str) -> str:
     """Create and serve one labelled synthetic Gold signal after association exists."""
-    from agri_shock.streaming.app import create_streaming_spark
+    from agri_shock.streaming.app import create_smoke_delta_spark
 
     association_path = delta_root / "gold" / "shock_price_associations"
     if not (association_path / "_delta_log").exists():
         raise RuntimeError("no Gold shock-price association exists; start streaming and publish smoke events first")
-    spark = create_streaming_spark("agrishock-smoke-gold")
+    spark = create_smoke_delta_spark("agrishock-smoke-gold")
     try:
         association = spark.read.format("delta").load(str(association_path)).filter(
             "shock_id = 'smoke-weather-dhemaji-2024-06-30' AND price_event_id = 'smoke-mandi-dhemaji-rice-2024-07-01'"

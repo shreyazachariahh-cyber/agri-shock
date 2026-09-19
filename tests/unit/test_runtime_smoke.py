@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+import sys
 
 import pytest
 
@@ -16,6 +18,7 @@ from agri_shock.runtime.smoke import (
     verify_delta_layout,
     verify_elasticsearch_signal,
 )
+from agri_shock.streaming import app as streaming_app
 from agri_shock.storage.medallion import (
     GoldSignalContext,
     build_gold_signal,
@@ -32,6 +35,43 @@ def test_synthetic_smoke_events_cover_all_ingestion_topics_and_publish() -> None
 
 def test_expected_signal_id_is_deterministic() -> None:
     assert expected_signal_id() == expected_signal_id()
+
+
+def test_delta_only_smoke_session_avoids_streaming_packages_and_is_single_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Builder:
+        def __init__(self) -> None:
+            self.master_value: str | None = None
+            self.options: dict[str, str] = {}
+
+        def master(self, value: str) -> "Builder":
+            self.master_value = value
+            return self
+
+        def config(self, key: str, value: str) -> "Builder":
+            self.options[key] = value
+            return self
+
+    builder = Builder()
+    configured: list[Builder] = []
+    expected_spark = object()
+
+    def configure_delta(input_builder: Builder) -> SimpleNamespace:
+        configured.append(input_builder)
+        return SimpleNamespace(getOrCreate=lambda: expected_spark)
+
+    monkeypatch.setattr(streaming_app, "_delta_builder", lambda _: builder)
+    monkeypatch.setitem(sys.modules, "delta", SimpleNamespace(configure_spark_with_delta_pip=configure_delta))
+
+    assert streaming_app.create_smoke_delta_spark("smoke") is expected_spark
+    assert configured == [builder]
+    assert builder.master_value == "local[1]"
+    assert builder.options == {
+        "spark.sql.shuffle.partitions": "1",
+        "spark.default.parallelism": "1",
+        "spark.ui.enabled": "false",
+    }
 
 
 def test_delta_layout_requires_all_transaction_logs(tmp_path: Path) -> None:
