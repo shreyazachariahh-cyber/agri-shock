@@ -11,7 +11,7 @@ from typing import Any
 
 from agri_shock.common.config import Settings
 from agri_shock.common.logging import configure_logging
-from agri_shock.streaming.contracts import EventTimePolicy
+from agri_shock.streaming.contracts import DLQ_DELTA_CHECKPOINT_NAME, DLQ_DELTA_RELATIVE_PATH, DLQ_ENVELOPE_FIELDS, EventTimePolicy
 from agri_shock.streaming.pipeline import bronze_events, kafka_input, parse_mandi, write_delta
 from agri_shock.geospatial.spark import (
     canonicalize_markets,
@@ -104,9 +104,10 @@ def parse_simple_event(kafka_df: Any, payload_schema: Any, required_payload_fiel
         ), invalid)
 
 
-def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> Any:
+def build_dlq_envelopes(invalid_stream: Any) -> Any:
+    """Create one canonical DLQ envelope for independent Kafka and Delta sinks."""
     from pyspark.sql import functions as F
-    envelope = invalid_stream.select(
+    return invalid_stream.select(
         F.concat(F.lit("dlq:"), F.sha2(F.concat_ws("|", "topic", F.col("partition").cast("string"), F.col("offset").cast("string"), "raw_json"), 256)).alias("event_id"), F.lit("dead_letter_event").alias("event_type"),
         F.coalesce("event_time", "kafka_timestamp").alias("event_time"), F.current_timestamp().alias("ingestion_time"),
         F.lit("agrishock_spark").alias("source"), F.lit("1.0").alias("schema_version"),
@@ -120,8 +121,16 @@ def start_dlq(invalid_stream: Any, settings: Settings, checkpoint_path: str) -> 
             F.col("kafka_timestamp").alias("kafka_timestamp"),
             F.current_timestamp().alias("processing_time"),
         ).alias("payload"),
-    ).selectExpr("CAST(event_id AS STRING) AS key", "to_json(struct(*)) AS value")
-    return (envelope.writeStream.format("kafka").option("kafka.bootstrap.servers", settings.kafka_bootstrap_servers)
+    )
+
+
+def start_dlq(envelopes: Any, settings: Settings, checkpoint_path: str) -> Any:
+    from pyspark.sql import functions as F
+    kafka_records = envelopes.select(
+        F.col("event_id").alias("key"),
+        F.to_json(F.struct(*[F.col(field) for field in DLQ_ENVELOPE_FIELDS])).alias("value"),
+    )
+    return (kafka_records.writeStream.format("kafka").option("kafka.bootstrap.servers", settings.kafka_bootstrap_servers)
         .option("topic", "dead-letter-events").option("checkpointLocation", checkpoint_path).outputMode("append").queryName("agrishock-dlq").start())
 
 
@@ -154,10 +163,13 @@ def start_application(settings: Settings) -> list[Any]:
     flood_payload = StructType([StructField("source_event_id", StringType()), StructField("event_start", StringType()), StructField("event_end", StringType()), StructField("alert_level", StringType()), StructField("geometry_json", StringType())])
     weather, weather_invalid = parse_simple_event(weather_raw, weather_payload, ["district", "rainfall_category"], policy)
     flood, flood_invalid = parse_simple_event(flood_raw, flood_payload, ["source_event_id"], policy)
+    invalid_events = mandi_invalid.unionByName(weather_invalid, allowMissingColumns=True).unionByName(flood_invalid, allowMissingColumns=True)
+    dlq_envelopes = build_dlq_envelopes(invalid_events)
     queries.extend([
         write_delta(weather, str(root / "silver" / "weather_events"), str(checkpoints / "silver_weather"), "agrishock-silver-weather", ["source"]),
         write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood", ["source"]),
-        start_dlq(mandi_invalid.unionByName(weather_invalid, allowMissingColumns=True).unionByName(flood_invalid, allowMissingColumns=True), settings, str(checkpoints / "dlq")),
+        start_dlq(dlq_envelopes, settings, str(checkpoints / "dlq")),
+        write_delta(dlq_envelopes, str(root / DLQ_DELTA_RELATIVE_PATH), str(checkpoints / DLQ_DELTA_CHECKPOINT_NAME), "agrishock-silver-dlq", ["source"]),
     ])
     market_dimension = spark.read.format("delta").load(settings.market_dimension_path)
     district_boundaries = spark.read.format("delta").load(settings.district_boundary_path)

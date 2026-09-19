@@ -3,6 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 
+
+DLQ_DELTA_RELATIVE_PATH = "silver/dlq_events"
+DLQ_DELTA_CHECKPOINT_NAME = "dlq_delta"
+DLQ_ENVELOPE_FIELDS = (
+    "event_id", "event_type", "event_time", "ingestion_time", "source",
+    "schema_version", "payload",
+)
+
 @dataclass(frozen=True, slots=True)
 class EventTimePolicy:
     watermark_hours: int

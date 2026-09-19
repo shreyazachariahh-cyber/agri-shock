@@ -7,13 +7,14 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from agri_shock.common.observability import summarize_health
+from agri_shock.streaming.contracts import DLQ_DELTA_RELATIVE_PATH
 
 
 TABLES = {
     "events_ingested": "bronze/raw_events",
     "silver_mandi": "silver/mandi_prices",
     "silver_weather": "silver/weather_events",
-    "dlq_events": "silver/dlq_events",
+    "dlq_events": DLQ_DELTA_RELATIVE_PATH,
     "unresolved_mappings": "silver/unresolved_market_mappings",
     "gold_associations": "gold/shock_price_associations",
     "gold_signals": "gold/market_shock_signals",

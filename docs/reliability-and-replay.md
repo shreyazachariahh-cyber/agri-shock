@@ -17,10 +17,16 @@ causation or make an insufficient-evidence result disappear.
 
 Malformed JSON, missing event IDs, invalid event times, and source-specific
 payload validation failures do not stop healthy records. Bronze retains the
-raw Kafka record independently. The Kafka DLQ payload includes the original
+raw Kafka record independently. The same canonical envelope is published to
+Kafka `dead-letter-events` for operations and appended to
+`silver/dlq_events` for durable querying/health. It includes the original
 payload, source topic/partition/offset, Kafka timestamp, processing timestamp,
 and a machine-readable failure reason. Producer-side normalization DLQ records
 also retain original source/event metadata and the raw source record.
+
+Kafka and Delta DLQ sinks have separate checkpoints. They are replay-safe for
+their own stable query/checkpoint pair, not a cross-sink transactional
+exactly-once guarantee.
 
 If a producer cannot publish its DLQ event after its bounded retry policy, it
 raises a visible error; it is not silently counted as handled.

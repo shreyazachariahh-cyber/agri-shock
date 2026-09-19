@@ -12,7 +12,7 @@ Read-only health summary:
 python -m agri_shock.runtime.health --delta-root "$DELTA_ROOT" --elasticsearch-url "$ELASTICSEARCH_URL"
 ```
 
-It counts existing Delta layers and Elasticsearch documents, then emits warning
+It counts existing Delta layers, including durable `silver/dlq_events`, and Elasticsearch documents, then emits warning
 codes for configured DLQ-rate and unresolved-geography conditions. Missing
 optional remediation tables count as zero; an unavailable Elasticsearch count
 is `-1`, not a successful result.
