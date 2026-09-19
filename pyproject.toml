@@ -10,7 +10,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0"]  # CI-safe unit/data-quality/chaos contracts; no services required.
 streaming = [
     "pyspark==3.5.6",
     "delta-spark==3.2.1",

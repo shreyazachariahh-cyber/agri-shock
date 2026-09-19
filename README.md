@@ -47,7 +47,20 @@ For a Windows PowerShell synthetic-stack run covering Kafka → Spark → Delta 
 Elasticsearch → Kibana, follow [the runtime validation runbook](docs/runtime-validation.md).
 It does not claim that the fixture represents real agricultural observations.
 
-## Quick start (foundation)
+## Engineering model
+
+- **Event time:** watermarks and shock/price association use source event time;
+  ingestion time remains audit metadata.
+- **Geography:** curated IDs and Sedona spatial joins associate events; missing
+  mappings go to remediation tables, never name-based guesses.
+- **Analytics:** a historical baseline, volatility-aware anomaly, and control
+  comparison feed a transparent signal. `signal_strength` and
+  `data_confidence` are intentionally separate.
+- **Reliability:** Bronze preserves raw Kafka deliveries; Silver deduplicates
+  by event ID within watermark/checkpoint state; Gold and Elasticsearch use
+  deterministic IDs for idempotent serving.
+
+## Setup and validation
 
 ```powershell
 python -m venv .venv
@@ -58,6 +71,12 @@ python -m pytest
 
 Copy `.env.example` to `.env` before configuring source credentials. Do not
 commit `.env`.
+
+For streaming, use Python 3.11, Java 17, and `pip install -e
+".[dev,streaming]"`. Start Docker services, run preflight, then follow the
+[runtime validation runbook](docs/runtime-validation.md). The local health
+report and deliberately dispatch-only benchmark are documented in
+[operations](docs/operations.md); benchmark results are not yet measured.
 
 ## Project conventions
 

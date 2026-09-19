@@ -9,6 +9,12 @@ __pycache__/
 data/local/
 data/delta/
 data/checkpoints/
+data/benchmark/
+data/runtime/
+spark-warehouse/
+metastore_db/
 *.log
+.DS_Store
+Thumbs.db
 .idea/
 .vscode/
