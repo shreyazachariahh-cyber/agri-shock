@@ -95,6 +95,7 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Delta medallion architecture](docs/medallion-architecture.md)
 - [Windows runtime validation](docs/runtime-validation.md)
 - [Reliability and replay](docs/reliability-and-replay.md)
+- [Operations and performance](docs/operations.md)
 - [Limitations](docs/limitations.md)
 
 ## License
