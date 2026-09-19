@@ -7,7 +7,9 @@ observations, or causal claims.
 ## Windows Spark runtime choice
 
 - Docker Desktop running; Kafka, Elasticsearch, and Kibana run in Compose.
-- Python 3.11, Java 17, and an active project virtual environment.
+- Python 3.11, Java 17, and an active project virtual environment. The
+  `streaming` dependency extra installs pandas because the Sedona/PySpark
+  runtime imports it; no separate manual pandas installation is required.
 
 ### Recommended: run Spark in WSL2
 

@@ -66,6 +66,10 @@ has no numeric strength. A Gold signal serializes through
 `GoldMarketShockSignal.to_document()` and is then validated by the Phase 7
 Elasticsearch indexer; there is no separate dashboard schema.
 
+Gold Delta materialization uses an explicit `StructType` for this contract.
+This preserves legitimate null analytical values and typed empty confidence
+reason arrays; a one-row replay must never rely on Spark schema inference.
+
 ## Delta semantics, checkpoints, and corrections
 
 - Every streaming sink has a deterministic path under `DELTA_ROOT` and a

@@ -14,6 +14,59 @@ from agri_shock.processing.scoring import MarketShockSignal
 GOLD_SIGNAL_CONTRACT_VERSION = "1.0"
 
 
+# Keep this contract independent from the optional Spark installation.  The
+# corresponding ``gold_signal_delta_schema`` imports PySpark only at the
+# runtime boundary, so contract/unit tests remain lightweight.
+GOLD_SIGNAL_DELTA_COLUMNS = (
+    "signal_id",
+    "shock_id",
+    "price_event_id",
+    "state_id",
+    "district_id",
+    "market_id",
+    "commodity_id",
+    "fixture_kind",
+    "state",
+    "district",
+    "market",
+    "commodity",
+    "shock_type",
+    "shock_time",
+    "price_event_time",
+    "event_time",
+    "ingestion_time",
+    "processing_time",
+    "model_contract_version",
+    "location",
+    "observed_price",
+    "baseline_price",
+    "deviation_pct",
+    "robust_z_score",
+    "days_after_shock",
+    "shock_severity",
+    "control_difference_pct",
+    "component_scores",
+    "signal_strength",
+    "signal_level",
+    "data_confidence",
+    "confidence_reasons",
+    "source_references",
+)
+
+# These are intentionally nullable.  In particular, an
+# INSUFFICIENT_EVIDENCE signal has no numerical strength and an unresolved
+# coordinate mapping has no location.  They must remain null rather than be
+# replaced with synthetic sentinel values at the Delta boundary.
+GOLD_SIGNAL_NULLABLE_COLUMNS = frozenset(
+    {
+        "location",
+        "robust_z_score",
+        "control_difference_pct",
+        "signal_strength",
+    }
+)
+
+
 def _utc(value: datetime, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")
@@ -204,6 +257,104 @@ def build_gold_signal(
         context=context,
         evidence=evidence,
         signal=signal,
+    )
+
+
+def _parse_document_timestamp(value: str, field_name: str) -> datetime:
+    """Parse an ISO-8601 Gold document timestamp for Spark TimestampType."""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError) as error:
+        raise ValueError(f"Gold document {field_name} must be an ISO-8601 timestamp") from error
+    return _utc(parsed, field_name)
+
+
+def gold_signal_delta_row(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Convert the serving document to typed Delta values without changing nulls.
+
+    Elasticsearch receives ISO timestamp strings, while Delta needs Python
+    datetimes for its explicit TimestampType schema.  All other values retain
+    their canonical Gold meaning, including optional analytical values.
+    """
+    missing = [column for column in GOLD_SIGNAL_DELTA_COLUMNS if column not in document]
+    if missing:
+        raise ValueError(f"Gold document is missing contract fields: {', '.join(missing)}")
+    row = {column: document[column] for column in GOLD_SIGNAL_DELTA_COLUMNS}
+    for column in ("shock_time", "price_event_time", "event_time", "ingestion_time", "processing_time"):
+        row[column] = _parse_document_timestamp(row[column], column)
+    return row
+
+
+def gold_signal_delta_schema() -> Any:
+    """Return the canonical nullable-aware Spark schema for Gold signals.
+
+    Importing PySpark lazily keeps the typed medallion contract usable in
+    non-streaming environments and gives the runtime a clear dependency error.
+    """
+    try:
+        from pyspark.sql.types import (
+            ArrayType,
+            BooleanType,
+            DoubleType,
+            IntegerType,
+            MapType,
+            StringType,
+            StructField,
+            StructType,
+            TimestampType,
+        )
+    except ImportError as error:
+        raise RuntimeError("Install agri-shock[streaming] to materialize Gold Delta signals") from error
+
+    string = StringType()
+    double = DoubleType()
+    timestamp = TimestampType()
+    return StructType(
+        [
+            StructField("signal_id", string, False),
+            StructField("shock_id", string, False),
+            StructField("price_event_id", string, False),
+            StructField("state_id", string, False),
+            StructField("district_id", string, False),
+            StructField("market_id", string, False),
+            StructField("commodity_id", string, False),
+            StructField("fixture_kind", string, False),
+            StructField("state", string, False),
+            StructField("district", string, False),
+            StructField("market", string, False),
+            StructField("commodity", string, False),
+            StructField("shock_type", string, False),
+            StructField("shock_time", timestamp, False),
+            StructField("price_event_time", timestamp, False),
+            StructField("event_time", timestamp, False),
+            StructField("ingestion_time", timestamp, False),
+            StructField("processing_time", timestamp, False),
+            StructField("model_contract_version", string, False),
+            StructField("location", MapType(string, double, False), True),
+            StructField("observed_price", double, False),
+            StructField("baseline_price", double, False),
+            StructField("deviation_pct", double, False),
+            StructField("robust_z_score", double, True),
+            StructField("days_after_shock", IntegerType(), False),
+            StructField("shock_severity", double, False),
+            StructField("control_difference_pct", double, True),
+            StructField("component_scores", MapType(string, double, False), False),
+            StructField("signal_strength", double, True),
+            StructField("signal_level", string, False),
+            StructField(
+                "data_confidence",
+                StructType(
+                    [
+                        StructField("value", double, False),
+                        StructField("is_sufficient", BooleanType(), False),
+                        StructField("reasons", ArrayType(string, False), False),
+                    ]
+                ),
+                False,
+            ),
+            StructField("confidence_reasons", ArrayType(string, False), False),
+            StructField("source_references", ArrayType(string, False), False),
+        ]
     )
 
 

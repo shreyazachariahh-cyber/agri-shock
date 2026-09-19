@@ -15,7 +15,13 @@ from agri_shock.processing.confidence import ConfidencePolicy, EvidenceQuality, 
 from agri_shock.processing.evidence import ShockEvidence
 from agri_shock.processing.scoring import SignalPolicy, evaluate_signal
 from agri_shock.storage.delta import merge_gold_signals
-from agri_shock.storage.medallion import GoldSignalContext, build_gold_signal, deterministic_signal_id
+from agri_shock.storage.medallion import (
+    GoldSignalContext,
+    build_gold_signal,
+    deterministic_signal_id,
+    gold_signal_delta_row,
+    gold_signal_delta_schema,
+)
 
 
 SMOKE_SHOCK_ID = "smoke-weather-dhemaji-2024-06-30"
@@ -110,6 +116,13 @@ def prepare_synthetic_reference_data(market_dimension_path: Path, district_bound
         spark.stop()
 
 
+def create_gold_signal_dataframe(spark: Any, document: Mapping[str, Any]) -> Any:
+    """Create one canonical Gold row with an explicit nullable-aware schema."""
+    return spark.createDataFrame(
+        [gold_signal_delta_row(document)], schema=gold_signal_delta_schema()
+    )
+
+
 def materialize_synthetic_gold(delta_root: Path, elasticsearch_url: str) -> str:
     """Create and serve one labelled synthetic Gold signal after association exists."""
     from agri_shock.streaming.app import create_streaming_spark
@@ -140,7 +153,10 @@ def materialize_synthetic_gold(delta_root: Path, elasticsearch_url: str) -> str:
         )
         document = build_gold_signal(context, ShockEvidence("IN.AS.DHEMAJI", "RICE", "rainfall_anomaly", 1.0, 800, 1000, -20, -2.0, 1, -12), signal).to_document()
         gold_path = delta_root / "gold" / "market_shock_signals"
-        merge_gold_signals(spark.createDataFrame([document]), str(gold_path))
+        # Do not infer schema from a single document: valid Gold fields can be
+        # null and a sufficient signal can have empty confidence-reason arrays.
+        gold_frame = create_gold_signal_dataframe(spark, document)
+        merge_gold_signals(gold_frame, str(gold_path))
         try:
             from elasticsearch import Elasticsearch
         except ImportError as error:

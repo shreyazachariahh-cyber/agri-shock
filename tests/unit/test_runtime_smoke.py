@@ -1,15 +1,24 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from agri_shock.ingestion.publisher import MemoryPublisher
+from agri_shock.processing.confidence import DataConfidence
+from agri_shock.processing.evidence import ShockEvidence
+from agri_shock.processing.scoring import MarketShockSignal
 from agri_shock.runtime.smoke import (
     SmokePaths,
+    create_gold_signal_dataframe,
     expected_signal_id,
     publish_synthetic_events,
     synthetic_events,
     verify_delta_layout,
     verify_elasticsearch_signal,
+)
+from agri_shock.storage.medallion import (
+    GoldSignalContext,
+    build_gold_signal,
 )
 
 
@@ -39,3 +48,44 @@ def test_elasticsearch_verification_requires_the_expected_id() -> None:
     verify_elasticsearch_signal("http://example.test", signal_id, lambda _: f'{{"_id":"{signal_id}"}}'.encode())
     with pytest.raises(RuntimeError, match="did not return"):
         verify_elasticsearch_signal("http://example.test", signal_id, lambda _: b'{"found":false}')
+
+
+def test_gold_materialization_uses_explicit_schema_for_nullable_contract_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: Spark must not infer nulls or empty arrays from one row."""
+    now = datetime(2024, 7, 2, tzinfo=timezone.utc)
+    document = build_gold_signal(
+        GoldSignalContext(
+            shock_id="shock-nullable",
+            price_event_id="price-nullable",
+            state_id="IN.BR",
+            district_id="IN.BR.PATNA",
+            market_id="IN.BR.PATNA.M1",
+            commodity_id="WHEAT",
+            shock_type="rainfall_anomaly",
+            shock_time=now,
+            price_event_time=now,
+            provenance_type="synthetic_demo",
+            source_references=("synthetic-smoke",),
+            processing_time=now,
+            location=None,
+        ),
+        ShockEvidence("IN.BR.PATNA", "WHEAT", "rainfall_anomaly", 0.5, 800, 1000, -20, None, 1, None),
+        MarketShockSignal(50.0, "MEDIUM", {}, DataConfidence(0.9, True, ())),
+    ).to_document()
+    explicit_schema = object()
+    monkeypatch.setattr("agri_shock.runtime.smoke.gold_signal_delta_schema", lambda: explicit_schema)
+
+    class RecordingSpark:
+        def createDataFrame(self, rows: list[dict[str, object]], *, schema: object) -> str:
+            self.rows = rows
+            self.schema = schema
+            return "typed-gold-frame"
+
+    spark = RecordingSpark()
+    assert create_gold_signal_dataframe(spark, document) == "typed-gold-frame"
+    assert spark.schema is explicit_schema
+    assert spark.rows[0]["location"] is None
+    assert spark.rows[0]["robust_z_score"] is None
+    assert spark.rows[0]["control_difference_pct"] is None
+    assert spark.rows[0]["confidence_reasons"] == []
+    assert spark.rows[0]["data_confidence"]["reasons"] == []

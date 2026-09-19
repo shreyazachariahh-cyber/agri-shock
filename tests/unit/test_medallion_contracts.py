@@ -9,9 +9,12 @@ from agri_shock.processing.scoring import MarketShockSignal
 from agri_shock.storage.medallion import (
     BronzeEvent,
     GoldSignalContext,
+    GOLD_SIGNAL_DELTA_COLUMNS,
+    GOLD_SIGNAL_NULLABLE_COLUMNS,
     SilverMandiObservation,
     build_gold_signal,
     deterministic_signal_id,
+    gold_signal_delta_row,
     late_event_disposition,
 )
 
@@ -102,6 +105,46 @@ def test_gold_document_preserves_event_time_provenance_and_elasticsearch_compati
     assert document["price_event_time"] == "2024-07-02T00:00:00+00:00"
     assert document["source_references"] == ["GDACS-1102678", "AGMARKNET-EXTRACT-1"]
     assert validate_document(document)["district_id"] == "IN.AS.DHEMAJI"
+
+
+def test_gold_delta_row_preserves_intentional_null_analytics_for_explicit_schema() -> None:
+    """A one-row Spark DataFrame must not infer types from null Gold fields."""
+    no_location_context = GoldSignalContext(
+        shock_id="weather-2",
+        price_event_id="price-2",
+        state_id="IN.BR",
+        district_id="IN.BR.PATNA",
+        market_id="IN.BR.PATNA.M1",
+        commodity_id="WHEAT",
+        shock_type="rainfall_anomaly",
+        shock_time=NOW - timedelta(days=1),
+        price_event_time=NOW,
+        provenance_type="synthetic_demo",
+        source_references=("synthetic-smoke",),
+        processing_time=NOW,
+    )
+    evidence = ShockEvidence(
+        "IN.BR.PATNA", "WHEAT", "rainfall_anomaly", 0.5, 800, 1000, -20, None, 1, None
+    )
+    signal = MarketShockSignal(
+        None,
+        "INSUFFICIENT_EVIDENCE",
+        {},
+        DataConfidence(0.2, False, ("insufficient_history",)),
+    )
+
+    row = gold_signal_delta_row(build_gold_signal(no_location_context, evidence, signal).to_document())
+
+    assert set(row) == set(GOLD_SIGNAL_DELTA_COLUMNS)
+    assert {"location", "robust_z_score", "control_difference_pct", "signal_strength"} <= GOLD_SIGNAL_NULLABLE_COLUMNS
+    assert row["location"] is None
+    assert row["robust_z_score"] is None
+    assert row["control_difference_pct"] is None
+    assert row["signal_strength"] is None
+    assert row["signal_level"] == "INSUFFICIENT_EVIDENCE"
+    assert row["data_confidence"]["reasons"] == ["insufficient_history"]
+    assert row["shock_time"] == NOW - timedelta(days=1)
+    assert row["processing_time"] == NOW
 
 
 def test_late_event_is_preserved_for_reconciliation_not_silently_dropped() -> None:

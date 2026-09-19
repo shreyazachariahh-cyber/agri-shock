@@ -17,6 +17,7 @@ streaming = [
     "confluent-kafka==2.9.0",
     "elasticsearch==8.15.1",
     "apache-sedona==1.9.0",
+    "pandas>=2.0,<3.0",
 ]
 
 [tool.pytest.ini_options]
