@@ -6,6 +6,9 @@ from __future__ import annotations
 from typing import Any
 from agri_shock.streaming.contracts import EventTimePolicy
 
+
+ADDITIVE_SCHEMA_EVOLUTION_SINKS = frozenset({"agrishock-silver-unresolved-market-mappings"})
+
 def create_spark(app_name: str = "agrishock-streaming") -> Any:
     try:
         from pyspark.sql import SparkSession
@@ -79,6 +82,7 @@ def write_delta(
     checkpoint_path: str,
     query_name: str,
     partition_by: list[str] | None = None,
+    allow_additive_schema_evolution: bool = False,
 ) -> Any:
     """Write only Delta with a deterministic checkpoint per materialized table.
 
@@ -87,8 +91,12 @@ def write_delta(
     exactly-once behaviour across arbitrary checkpoint deletion or source
     corrections.
     """
+    if allow_additive_schema_evolution and query_name not in ADDITIVE_SCHEMA_EVOLUTION_SINKS:
+        raise ValueError(f"additive schema evolution is not approved for {query_name}")
     writer = (stream_df.writeStream.format("delta").outputMode("append")
         .option("checkpointLocation", checkpoint_path).queryName(query_name))
+    if allow_additive_schema_evolution:
+        writer = writer.option("mergeSchema", "true")
     if partition_by:
         writer = writer.partitionBy(*partition_by)
     return writer.start(path)

@@ -36,3 +36,9 @@ partitioning and Spark parallelism deliberately, compact Delta files under a
 separate maintenance policy, broadcast small versioned references when proven
 safe, and tune Elasticsearch bulk size/shards from observed rejections and
 latency.
+
+For the existing unresolved-market remediation table, the additive
+`mapping_reason` field is evolved through that sink's explicit Delta
+`mergeSchema` option. Operators must not delete data or checkpoints for this
+upgrade. Renames, type changes, and other sink schemas still require an
+intentional migration rather than automatic merge.

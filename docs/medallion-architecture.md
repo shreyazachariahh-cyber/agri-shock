@@ -98,6 +98,9 @@ nested confidence values. Integral fields remain integral.
   sent to reconciliation rather than silently becoming a stateful Silver/Gold
   update. Periodic batch reconciliation recomputes the affected logical keys.
 - Schema evolution is additive only for Bronze/Silver/Gold minor versions.
+  The established `silver/unresolved_market_mappings` sink explicitly enables
+  Delta `mergeSchema` for its additive `mapping_reason` remediation field;
+  automatic schema merge is not enabled globally or on unrelated sinks.
   Renames, semantic type changes, and analytical changes require a new
   model-contract version and serving index version, with migration/backfill
   documented before activation.

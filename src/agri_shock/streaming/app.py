@@ -179,7 +179,7 @@ def start_application(settings: Settings) -> list[Any]:
     queries.append(write_delta(
         unresolved_markets, str(root / "silver" / "unresolved_market_mappings"),
         str(checkpoints / "silver_unresolved_market_mappings"),
-        "agrishock-silver-unresolved-market-mappings", ["source"],
+        "agrishock-silver-unresolved-market-mappings", ["source"], allow_additive_schema_evolution=True,
     ))
     queries.append(write_delta(
         unresolved_weather_mappings(weather, district_boundaries),
