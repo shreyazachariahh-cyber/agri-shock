@@ -38,7 +38,12 @@ def _date(raw: str, field: str) -> datetime:
     raise NormalizationError(f"invalid_{field}")
 
 
-def normalize_mandi(raw: Mapping[str, Any], ingestion_time: datetime | None = None) -> EventEnvelope:
+def normalize_mandi(
+    raw: Mapping[str, Any],
+    ingestion_time: datetime | None = None,
+    *,
+    documented_price_unit: str | None = None,
+) -> EventEnvelope:
     event_time = _date(_required(raw, "Arrival_Date"), "arrival_date")
     payload = {
         "state": _required(raw, "State"), "district": _required(raw, "District"),
@@ -47,12 +52,16 @@ def normalize_mandi(raw: Mapping[str, Any], ingestion_time: datetime | None = No
         "min_price": _decimal(raw.get("Min_Price"), "min_price"),
         "modal_price": _decimal(raw.get("Modal_Price"), "modal_price"),
         "max_price": _decimal(raw.get("Max_Price"), "max_price"),
-        "price_unit": str(raw.get("Price_Unit", "INR/quintal")),
+        "price_unit": str(raw.get("Price_Unit") or documented_price_unit or "").strip(),
     }
+    if not payload["price_unit"]:
+        raise NormalizationError("missing_price_unit")
     result = validate_mandi_price(payload)
     if not result.valid:
         raise NormalizationError(result.reason or "invalid_mandi_price")
-    source_key = "|".join((payload["state"], payload["district"], payload["market"], payload["commodity"], event_time.date().isoformat()))
+    # AGMARKNET can report multiple varieties for one market/commodity/day.
+    # Include the normalized variety and unit so they cannot collapse on replay.
+    source_key = "|".join((payload["state"], payload["district"], payload["market"], payload["commodity"], payload["variety"] or "", payload["price_unit"], event_time.date().isoformat()))
     return EventEnvelope(stable_event_id("ogd_agmarknet", source_key, event_time), "mandi_price", event_time, ingestion_time or utc_now(), "ogd_agmarknet", "1.0", payload)
 
 

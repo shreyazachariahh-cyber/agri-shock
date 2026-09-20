@@ -31,6 +31,35 @@ fixtures and replay data.
 - **Limitations:** API-key/key-quota policy and historical coverage require
   verification when a real project key and target resource are selected.
 
+### Historical discovery workflow
+
+AgriShock uses the official OGD resource identifier
+`9ef84268-d588-465a-a308-a864a43d0070` through
+`https://api.data.gov.in/resource/{resource-id}`. A `DATA_GOV_IN_API_KEY` is
+required and is supplied only at runtime as the `api-key` request parameter.
+The acquisition command deliberately limits discovery requests to 1–100 rows:
+
+```bash
+python -m agri_shock.ingestion.historical_mandi fetch \
+  --output-dir data/local/source-acquisition/ogd-mandi --limit 10
+```
+
+It writes a raw response, replayable NDJSON labelled `replayed_historical`,
+and a manifest containing provider, catalogue/resource references, retrieval
+time, non-secret request parameters, observed raw fields, accepted/rejected
+counts, and row-level rejection reasons. These files are local runtime data
+and are not committed. The companion audit command reports date extent,
+dimensions, varieties, and critical-field missing rates:
+
+```bash
+python -m agri_shock.ingestion.historical_mandi audit --raw-file PATH_TO_RAW_JSON
+```
+
+The documented catalogue describes prices as rupees per quintal; the OGD
+converter records this explicit source assumption as `INR/quintal` only when a
+row lacks `Price_Unit`. Variety is included in the stable source identity, so
+same-day varieties cannot collapse into one replay event.
+
 ## 2. IMD districtwise rainfall
 
 - **Documentation:** [IMD API documentation](https://mausam.imd.gov.in/imd_latest/contents/api.pdf).

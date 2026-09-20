@@ -14,12 +14,17 @@ from agri_shock.ingestion.http import fetch_json
 class MandiProducer(ProducerBase):
     topic = "mandi-prices"
 
+    # The official OGD catalogue describes these AGMARKNET wholesale prices as
+    # rupees per quintal. This source-specific assumption is never applied by
+    # the generic normalizer.
+    documented_price_unit = "INR/quintal"
+
     def ingest(self, records: Iterable[Mapping[str, Any]]) -> ProducerReport:
         events: list[EventEnvelope] = []
         rejected = 0
         for record in records:
             try:
-                events.append(normalize_mandi(record))
+                events.append(normalize_mandi(record, documented_price_unit=self.documented_price_unit))
             except Exception as error:
                 self.reject_raw("ogd_agmarknet", "mandi_price", record, str(error))
                 rejected += 1
