@@ -15,6 +15,7 @@ from agri_shock.runtime.smoke import (
     expected_signal_id,
     publish_synthetic_events,
     synthetic_events,
+    verify_delta_content,
     verify_delta_layout,
     verify_elasticsearch_signal,
 )
@@ -81,6 +82,64 @@ def test_delta_layout_requires_all_transaction_logs(tmp_path: Path) -> None:
     for table in paths.required_tables:
         (table / "_delta_log").mkdir(parents=True)
     verify_delta_layout(paths)
+
+
+def test_gold_association_verification_uses_composite_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A flood may share a price event without duplicating the weather association."""
+    targeted = {
+        "shock_id": "smoke-weather-dhemaji-2024-06-30",
+        "price_event_id": "smoke-mandi-dhemaji-rice-2024-07-01",
+    }
+    legitimate_flood = {
+        "shock_id": "smoke-flood-dhemaji-2024-06-30",
+        "price_event_id": "smoke-mandi-dhemaji-rice-2024-07-01",
+    }
+    association_rows = [targeted, legitimate_flood]
+
+    class Frame:
+        def __init__(self, path: str) -> None:
+            self.path = path
+            self.predicate = ""
+
+        def filter(self, predicate: str) -> "Frame":
+            self.predicate = predicate
+            return self
+
+        def limit(self, _: int) -> "Frame":
+            return self
+
+        def count(self) -> int:
+            if self.path.endswith("shock_price_associations"):
+                assert "shock_id = 'smoke-weather-dhemaji-2024-06-30'" in self.predicate
+                assert "price_event_id = 'smoke-mandi-dhemaji-rice-2024-07-01'" in self.predicate
+                return sum(row == targeted for row in association_rows)
+            return 1
+
+    class Reader:
+        def format(self, _: str) -> "Reader":
+            return self
+
+        def load(self, path: str) -> Frame:
+            return Frame(path)
+
+    class Spark:
+        read = Reader()
+
+        def stop(self) -> None:
+            pass
+
+    monkeypatch.setattr("agri_shock.runtime.smoke.verify_delta_layout", lambda _: None)
+    monkeypatch.setattr(streaming_app, "create_smoke_delta_spark", lambda _: Spark())
+
+    paths = SmokePaths(tmp_path)
+    verify_delta_content(paths)
+
+    association_rows.append(targeted.copy())
+    with pytest.raises(RuntimeError, match="expected exactly one Gold association, found 2"):
+        verify_delta_content(paths)
 
 
 def test_elasticsearch_verification_requires_the_expected_id() -> None:
