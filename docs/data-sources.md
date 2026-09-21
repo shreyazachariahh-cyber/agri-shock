@@ -60,6 +60,60 @@ converter records this explicit source assumption as `INR/quintal` only when a
 row lacks `Price_Unit`. Variety is included in the stable source identity, so
 same-day varieties cannot collapse into one replay event.
 
+### AGMARKNET 2.0 public historical reports (Phase 13A discovery)
+
+The official [AGMARKNET 2.0 Prices & Arrival Reports](https://agmarknet.gov.in/pricearrivalreportlist)
+are a separate, public browser-reporting interface operated by DMI. They do
+not require an API key for the price-report queries tested during Phase 13A.
+The reports are session-backed form submissions; their result URLs do not
+encode the selected filters, so a reproducible acquisition must retain both
+the raw export and a manifest of the selected filters.
+
+The strongest verified price report is **Market-wise, Commodity-wise Daily
+Report for State/UT**:
+
+- Input: [official report form](https://agmarknet.gov.in/marketwisedailystatereportinput),
+  with State/UT and date filters.
+- Result: [official report result](https://agmarknet.gov.in/marketwisedailystatereportoutput),
+  with an Export control (CSV, Excel, and PDF shown by the UI).
+- Observed fields: state and report date in the title; market context rows;
+  commodity group context rows; Commodity; Arrivals; Unit of Arrivals; Variety;
+  Minimum Price; Maximum Price; Modal Price; Unit of Price.
+- Explicit unit evidence: real rows label price as `Rs./Quintal`. A source
+  adapter must retain the row-level unit and reject non-quintal rows unless a
+  compatible canonical-unit conversion is deliberately implemented. For
+  example, the same real Himachal report included `Rs./Bundle` rows, which
+  are not interchangeable with wholesale price-per-quintal observations.
+- Real queries observed: Tamil Nadu on 2023-12-26, including
+  `Thammampati APMC` / Onion / Other / 3000.00 / 3300.00 / 3150.00
+  Rs./Quintal; and Himachal Pradesh on 2023-07-10, including multiple
+  markets and varieties. These observations establish source availability,
+  not a case-study result or a causal inference.
+
+This report does **not** expose district in its downloadable/table contract.
+Its context-only rows also require a stateful parser: blank Commodity or
+Arrivals cells inherit the preceding market/commodity context and must never
+be treated as complete independent records.
+
+The official [Market Profile](https://agmarknet.gov.in/viewmarketprofileinputpublic)
+provides a first-party hierarchical reference lookup of State/UT → District →
+Market. Phase 13A verified that its Tamil Nadu → Salem market list contains
+`Thammampati APMC`, establishing an official, deterministic mapping for that
+specific market name in that state/district context. The final profile lookup
+requires a CAPTCHA. We did not solve, bypass, automate around, or submit it.
+The interface has no verified bulk export or stable, versioned market-ID
+download. Consequently it is not yet a sufficient reproducible master-data
+source for a general State + Market → District reference table. AgriShock must
+leave unverified/ambiguous mappings unresolved rather than infer districts
+from market names.
+
+**Phase 13A status:** real 2023 price observations are proven for the two
+candidate states, but canonical historical event production is intentionally
+blocked pending an official, versionable district-bearing report or an
+officially exportable market-directory reference. No source rows from this
+browser investigation have been committed as fixtures or presented as a
+complete coverage extract.
+
 ## 2. IMD districtwise rainfall
 
 - **Documentation:** [IMD API documentation](https://mausam.imd.gov.in/imd_latest/contents/api.pdf).
