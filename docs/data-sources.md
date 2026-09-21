@@ -107,12 +107,16 @@ source for a general State + Market → District reference table. AgriShock must
 leave unverified/ambiguous mappings unresolved rather than infer districts
 from market names.
 
-**Phase 13A status:** real 2023 price observations are proven for the two
-candidate states, but canonical historical event production is intentionally
-blocked pending an official, versionable district-bearing report or an
-officially exportable market-directory reference. No source rows from this
-browser investigation have been committed as fixtures or presented as a
-complete coverage extract.
+**Phase 13A verified facts:** official historical AGMARKNET price availability
+was confirmed for Tamil Nadu 2023 and Himachal Pradesh 2023. The reports carry
+explicit row-level price units, including both `Rs./Quintal` and
+`Rs./Bundle`, and have a stateful structure. They omit district. The official
+Market Profile proves that State → District → Market relationships exist, but
+reproducible bulk acquisition is blocked by CAPTCHA and the absence of a
+verified export. A nationwide bulk-reference discovery was completed without
+finding a verified, retrievable master. No source rows from this browser
+investigation have been committed as fixtures or presented as a complete
+coverage extract.
 
 ### Phase 13A geography-reference investigation
 
@@ -153,6 +157,38 @@ next acceptable acquisition is either (1) an officially downloadable,
 versioned market master, or (2) an official district-bearing historical price
 export. Until then, rows remain raw/provenanced observations rather than
 canonical geography-resolved analytics input.
+
+### Scoped case-study reference strategy and Phase 13A completion
+
+The general/production ingestion contract is unchanged: source observations
+without authoritative geographic resolution remain unresolved and observable
+in remediation output. They are never promoted to canonical market geography
+by guessing from a market name.
+
+The eventual portfolio case study may instead use a **small, versioned,
+provenance-backed reference snapshot** limited to that case's participating
+markets. Each State → District → Market row must be evidenced by an
+authoritative official source and retain its source URL/reference, retrieval
+date, source provenance, and any available official identifier. This is not a
+nationwide market master, must not be reused outside its documented scope, and
+must be versioned with the case-study artifact. Ambiguous or unsupported rows
+remain unresolved.
+
+This bounded strategy is scientifically defensible because it preserves the
+same no-inference geography requirement while making the evidence and scope of
+each association inspectable. It also preserves the following safeguards:
+
+- Geography is never guessed.
+- Incompatible price units are never silently combined.
+- CAPTCHA is never bypassed.
+- An unofficial dataset never silently becomes canonical.
+- Case selection is based on data completeness and analytical feasibility—not
+  on whichever candidate has the most dramatic price movement or signal.
+
+**Phase 13A completion note:** discovery and source validation are complete.
+Bounded geography resolution is a prerequisite for the selected case study and
+will be addressed after case selection; this phase does not select a case or
+run the analytical signal model.
 
 ## 2. IMD districtwise rainfall
 
