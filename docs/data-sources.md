@@ -114,6 +114,46 @@ officially exportable market-directory reference. No source rows from this
 browser investigation have been committed as fixtures or presented as a
 complete coverage extract.
 
+### Phase 13A geography-reference investigation
+
+The following official Government of India sources were checked before
+declaring the historical-price importer blocked on district resolution:
+
+- OGD/data.gov.in: the nationwide DMI/AGMARKNET mandi resource exposes a
+  district field in its documented record schema, but its API requires a
+  personal key and the authenticated CSV route yielded a zero-byte download in
+  this investigation. It is therefore not a usable non-authenticated bulk
+  reference acquisition path.
+- AGMARKNET 2.0: the public Market Profile confirms that State → District →
+  Market relationships are maintained, but the final profile request is
+  CAPTCHA-gated and no public bulk export/versioned market master was found.
+- eNAM: the public [Aspirational Districts mapping](https://enam.gov.in/aspirational-districts)
+  is a first-party State/District/Mandi table, but it is explicitly limited to
+  aspirational districts and cannot serve as a national master. The public
+  [eNAM Mandi contact interface](https://enam.gov.in/apmc-contact-details)
+  exposes State, District, and APMC filters, but did not return its underlying
+  state/reference options in the tested session and offers no verified export.
+  An official, dated eNAM Directory artifact was identified at
+  `https://logistics.enam.gov.in/web/assest/download/eNAM_Directory_20210720.pdf`,
+  but its official host timed out from both the browser and retrieval service.
+  Because its contents, coverage, and version semantics could not be directly
+  retrieved from the official host, it is not used as AgriShock reference data.
+- eNAM's public [Trade Details](https://enam.gov.in/dashboard/trade-data)
+  report has State, APMC, commodity, price, unit, and date fields, but no
+  district field in the displayed table. It is therefore not a replacement for
+  the required district-bearing historical price contract.
+
+No official, bulk, versioned State + District + Market/APMC reference was
+both discovered **and successfully retrieved** during this phase. The only
+verified official market-to-district evidence is the interactive AGMARKNET
+Market Profile and eNAM's limited aspirational-district table. Neither is a
+replayable national master. Consequently, the historical importer must not
+promote market-only AGMARKNET observations into canonical price events. The
+next acceptable acquisition is either (1) an officially downloadable,
+versioned market master, or (2) an official district-bearing historical price
+export. Until then, rows remain raw/provenanced observations rather than
+canonical geography-resolved analytics input.
+
 ## 2. IMD districtwise rainfall
 
 - **Documentation:** [IMD API documentation](https://mausam.imd.gov.in/imd_latest/contents/api.pdf).
