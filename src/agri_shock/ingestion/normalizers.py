@@ -43,6 +43,7 @@ def normalize_mandi(
     ingestion_time: datetime | None = None,
     *,
     documented_price_unit: str | None = None,
+    source: str = "ogd_agmarknet",
 ) -> EventEnvelope:
     event_time = _date(_required(raw, "Arrival_Date"), "arrival_date")
     payload = {
@@ -62,7 +63,7 @@ def normalize_mandi(
     # AGMARKNET can report multiple varieties for one market/commodity/day.
     # Include the normalized variety and unit so they cannot collapse on replay.
     source_key = "|".join((payload["state"], payload["district"], payload["market"], payload["commodity"], payload["variety"] or "", payload["price_unit"], event_time.date().isoformat()))
-    return EventEnvelope(stable_event_id("ogd_agmarknet", source_key, event_time), "mandi_price", event_time, ingestion_time or utc_now(), "ogd_agmarknet", "1.0", payload)
+    return EventEnvelope(stable_event_id(source, source_key, event_time), "mandi_price", event_time, ingestion_time or utc_now(), source, "1.0", payload)
 
 
 def normalize_weather(raw: Mapping[str, Any], ingestion_time: datetime | None = None) -> EventEnvelope:

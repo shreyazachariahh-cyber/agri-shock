@@ -158,6 +158,31 @@ versioned market master, or (2) an official district-bearing historical price
 export. Until then, rows remain raw/provenanced observations rather than
 canonical geography-resolved analytics input.
 
+### Vellore case-study daily-report importer (Phase 13D)
+
+The official **Market-wise, Commodity-wise Daily Report for State/UT** has a
+public form at the input route and a session-backed result route. The visible
+form exposes State/UT and date controls, but its result URL has no filters and
+the site does not publish a stable HTTP payload contract. AgriShock therefore
+does not automate a guessed POST or replay browser cookies outside the normal
+form. The supported reproducible route is an operator-exported official CSV:
+
+```powershell
+& .\.venv\Scripts\python.exe -m agri_shock.ingestion.agmarknet_state_report `
+  --report-file data/local/source-acquisition/agmarknet/tamil-nadu-2023-12-04.csv `
+  --market-reference data/case_studies/tamil-nadu-michaung-2023/market-reference.v1.json `
+  --output-dir data/local/source-acquisition/agmarknet/replay `
+  --target-market 'Vellore APMC' --target-commodity 'Paddy(Common)'
+```
+
+The importer records the unchanged raw-report path and SHA-256 in a manifest,
+retains report-level date/state and stateful market/commodity context, labels
+accepted rows `replayed_historical`, and writes rejects separately. Only the
+case-scoped official Vellore reference supplies district. `ADT 37` and
+`Other` remain different event identities. The importer accepts only the
+source's explicit `Rs./Quintal` rows for this series; it neither combines nor
+converts incompatible rows such as `Rs./Bundle`.
+
 ### Scoped case-study reference strategy and Phase 13A completion
 
 The general/production ingestion contract is unchanged: source observations
