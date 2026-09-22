@@ -27,8 +27,12 @@ def test_dlq_contract_has_durable_path_independent_checkpoint_and_full_envelope(
     )
 
 
-def test_only_existing_unresolved_market_sink_is_approved_for_additive_schema_evolution() -> None:
-    assert ADDITIVE_SCHEMA_EVOLUTION_SINKS == {"agrishock-silver-unresolved-market-mappings"}
+def test_only_documented_restart_compatible_sinks_are_approved_for_additive_schema_evolution() -> None:
+    assert ADDITIVE_SCHEMA_EVOLUTION_SINKS == {
+        "agrishock-silver-unresolved-market-mappings",
+        "agrishock-silver-flood",
+        "agrishock-gold-associations",
+    }
 
 
 def test_unresolved_market_sink_uses_explicit_additive_delta_schema_option() -> None:

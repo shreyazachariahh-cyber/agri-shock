@@ -7,7 +7,7 @@ from typing import Any
 from agri_shock.streaming.contracts import EventTimePolicy
 
 
-ADDITIVE_SCHEMA_EVOLUTION_SINKS = frozenset({"agrishock-silver-unresolved-market-mappings"})
+ADDITIVE_SCHEMA_EVOLUTION_SINKS = frozenset({"agrishock-silver-unresolved-market-mappings", "agrishock-silver-flood", "agrishock-gold-associations"})
 
 def create_spark(app_name: str = "agrishock-streaming") -> Any:
     try:

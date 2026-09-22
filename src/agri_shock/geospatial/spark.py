@@ -41,7 +41,10 @@ def unresolved_weather_mappings(weather: Any, district_boundaries: Any) -> Any:
 def unresolved_flood_mappings(floods: Any, district_boundaries: Any) -> Any:
     """Retain missing or non-intersecting flood geometries for remediation."""
     from pyspark.sql import functions as F
-    missing_geometry = (floods.filter(F.col("geometry_json").isNull())
+    reference = district_boundaries.select("district_id", F.upper(F.trim("source_state")).alias("_source_state"), F.upper(F.trim("source_district")).alias("_source_district"))
+    reported = floods.filter(F.col("geometry_json").isNull() & F.col("reported_state").isNotNull() & F.col("reported_district").isNotNull()).select("*", F.upper(F.trim("reported_state")).alias("_source_state"), F.upper(F.trim("reported_district")).alias("_source_district"))
+    unresolved_reported = (reported.join(reference, ["_source_state", "_source_district"], "left").filter(F.col("district_id").isNull()).drop("district_id", "_source_state", "_source_district").withColumn("mapping_status", F.lit("unresolved")).withColumn("mapping_reason", F.lit("reported_district_reference_not_found")))
+    missing_geometry = (floods.filter(F.col("geometry_json").isNull() & (F.col("reported_state").isNull() | F.col("reported_district").isNull()))
         .withColumn("mapping_status", F.lit("unresolved"))
         .withColumn("mapping_reason", F.lit("missing_flood_geometry")))
     districts = district_boundaries.select(
@@ -54,14 +57,25 @@ def unresolved_flood_mappings(floods: Any, district_boundaries: Any) -> Any:
         .drop("district_id", "_flood_geometry", "_district_geometry")
         .withColumn("mapping_status", F.lit("unresolved"))
         .withColumn("mapping_reason", F.lit("flood_geometry_did_not_intersect_reference")))
-    return missing_geometry.unionByName(unmatched, allowMissingColumns=True)
+    return missing_geometry.unionByName(unmatched, allowMissingColumns=True).unionByName(unresolved_reported, allowMissingColumns=True)
+
+def district_reported_flood_shocks(floods: Any, district_boundaries: Any) -> Any:
+    """Associate only an authoritative source-reported district identity.
+
+    This deliberately does not spatially intersect a district boundary: the
+    boundary is a reference key, not an asserted inundation footprint.
+    """
+    from pyspark.sql import functions as F
+    reference = district_boundaries.select("district_id", F.upper(F.trim("source_state")).alias("_source_state"), F.upper(F.trim("source_district")).alias("_source_district"))
+    reported = floods.filter(F.col("geometry_json").isNull() & F.col("reported_state").isNotNull() & F.col("reported_district").isNotNull()).select("*", F.upper(F.trim("reported_state")).alias("_source_state"), F.upper(F.trim("reported_district")).alias("_source_district"))
+    return reported.join(reference, ["_source_state", "_source_district"], "inner").select(F.col("event_id").alias("shock_id"), F.lit("flood").alias("shock_type"), F.col("event_time").alias("shock_time"), "district_id", F.lit("source_reported_district").alias("spatial_relationship"), F.lit(None).cast("double").alias("shock_severity"), F.col("source_event_id").alias("source_reference"))
 
 def flood_shocks(floods: Any, district_boundaries: Any) -> Any:
     """Spatially associate GeoJSON flood geometry to canonical districts."""
     from pyspark.sql import functions as F
     flood_geometry = floods.filter(F.col("geometry_json").isNotNull()).withColumn("_flood_geometry", F.expr("ST_GeomFromGeoJSON(geometry_json)"))
     districts = district_boundaries.select("district_id", F.expr("ST_GeomFromGeoJSON(geometry_json)").alias("_district_geometry"))
-    return flood_geometry.join(districts, F.expr("ST_Intersects(_flood_geometry, _district_geometry)"), "inner").select(F.col("event_id").alias("shock_id"), F.lit("flood").alias("shock_type"), F.col("event_time").alias("shock_time"), "district_id", F.lit("same_district").alias("spatial_relationship"), F.lit(None).cast("double").alias("shock_severity"), F.col("source_event_id").alias("source_reference"))
+    return flood_geometry.join(districts, F.expr("ST_Intersects(_flood_geometry, _district_geometry)"), "inner").select(F.col("event_id").alias("shock_id"), F.lit("flood").alias("shock_type"), F.col("event_time").alias("shock_time"), "district_id", F.lit("spatial_geometry_intersects").alias("spatial_relationship"), F.lit(None).cast("double").alias("shock_severity"), F.col("source_event_id").alias("source_reference"))
 
 def weather_shocks(weather: Any, district_boundaries: Any) -> Any:
     """Map district weather observations using the same curated boundary reference."""

@@ -15,6 +15,7 @@ from agri_shock.streaming.contracts import DLQ_DELTA_CHECKPOINT_NAME, DLQ_DELTA_
 from agri_shock.streaming.pipeline import bronze_events, kafka_input, parse_mandi, write_delta
 from agri_shock.geospatial.spark import (
     canonicalize_markets,
+    district_reported_flood_shocks,
     flood_shocks,
     unresolved_flood_mappings,
     unresolved_weather_mappings,
@@ -160,14 +161,14 @@ def start_application(settings: Settings) -> list[Any]:
     ))
     from pyspark.sql.types import DecimalType, StringType, StructField, StructType
     weather_payload = StructType([StructField("state", StringType()), StructField("district", StringType()), StructField("rainfall_actual_mm", DecimalType(12, 2)), StructField("rainfall_normal_mm", DecimalType(12, 2)), StructField("rainfall_departure_pct", DecimalType(12, 2)), StructField("rainfall_category", StringType()), StructField("imd_object_id", StringType())])
-    flood_payload = StructType([StructField("source_event_id", StringType()), StructField("event_start", StringType()), StructField("event_end", StringType()), StructField("alert_level", StringType()), StructField("geometry_json", StringType())])
+    flood_payload = StructType([StructField("source_event_id", StringType()), StructField("event_start", StringType()), StructField("event_end", StringType()), StructField("alert_level", StringType()), StructField("geometry_json", StringType()), StructField("reported_state", StringType()), StructField("reported_district", StringType()), StructField("geography_basis", StringType()), StructField("event_time_precision", StringType()), StructField("inundated_area_hectares", StringType()), StructField("source_map_id", StringType())])
     weather, weather_invalid = parse_simple_event(weather_raw, weather_payload, ["district", "rainfall_category"], policy)
     flood, flood_invalid = parse_simple_event(flood_raw, flood_payload, ["source_event_id"], policy)
     invalid_events = mandi_invalid.unionByName(weather_invalid, allowMissingColumns=True).unionByName(flood_invalid, allowMissingColumns=True)
     dlq_envelopes = build_dlq_envelopes(invalid_events)
     queries.extend([
         write_delta(weather, str(root / "silver" / "weather_events"), str(checkpoints / "silver_weather"), "agrishock-silver-weather", ["source"]),
-        write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood", ["source"]),
+        write_delta(flood, str(root / "silver" / "flood_events"), str(checkpoints / "silver_flood"), "agrishock-silver-flood", ["source"], allow_additive_schema_evolution=True),
         start_dlq(dlq_envelopes, settings, str(checkpoints / "dlq")),
         write_delta(dlq_envelopes, str(root / DLQ_DELTA_RELATIVE_PATH), str(checkpoints / DLQ_DELTA_CHECKPOINT_NAME), "agrishock-silver-dlq", ["source"]),
     ])
@@ -193,12 +194,12 @@ def start_application(settings: Settings) -> list[Any]:
         str(checkpoints / "silver_unresolved_flood_mappings"),
         "agrishock-silver-unresolved-flood-mappings", ["source"],
     ))
-    shocks = weather_shocks(weather, district_boundaries).unionByName(flood_shocks(flood, district_boundaries))
+    shocks = weather_shocks(weather, district_boundaries).unionByName(flood_shocks(flood, district_boundaries)).unionByName(district_reported_flood_shocks(flood, district_boundaries))
     associations = join_shocks_to_prices(shocks, canonical_prices, ShockJoinPolicy(settings.shock_lookahead_days))
     queries.append(write_delta(
         associations, str(root / "gold" / "shock_price_associations"),
         str(checkpoints / "gold_associations"), "agrishock-gold-associations",
-        ["shock_type"],
+        ["shock_type"], allow_additive_schema_evolution=True,
     ))
     return queries
 
