@@ -50,18 +50,34 @@ No control market is admitted in this phase because its authoritative
 market-to-district mapping and unaffected-geography evidence have not yet been
 captured.
 
-## Raw-artifact acquisition and manifest
+## Verified raw artifacts and manifest
 
-Raw artifacts belong beneath the gitignored `data/local/source-acquisition/`.
-They must be saved unchanged, with a manifest recording provider, source URL,
-original filename, retrieval time, SHA-256, source type, filters/context, and
-the `replayed_historical` classification. The current desktop runner could not
-download the official PDFs or NWIC ZIP: its HTTP layer reported an
-authentication/proxy failure, the browser cancelled the ZIP download, and its
-WSL service was inaccessible. No absent file has been represented as obtained.
+The following local, gitignored artifacts were subsequently retrieved in WSL
+and verified by this phase. They are kept unchanged under
+`data/local/source-acquisition/environment/`:
 
-After successfully preserving the NRSC document and creating a reviewed JSON
-extract, run:
+| Artifact | SHA-256 verified by AgriShock | Result |
+|---|---|---|
+| `nrsc-michaung-vellore-2023.pdf` | `f045f6f21ecd1d5fb819ed4a23872e3f515dcff1386da6f4a7057219da2f2a1a` | PDF text confirms the 07 Dec 2023 (0600 IST) acquisition, lists Vellore, and reports 144 ha. |
+| `district_nwic_geojson.zip` | `44c734cc72139f2447dcebfe2791cac862dc5ba265e158912d797cf3410d5c37` | Contains the declared EPSG:7755 district GeoJSON. |
+| Extracted `district_nwic.GeoJSON` | `2b27a478e24d8c51b0655e74ce3f4f880e75c752e4597550d6fc925ed06ac201` | 733 features; exactly one `Tamil Nadu` / `Vellore` feature. |
+
+The originally supplied NRSC hash omitted the leading `f0`; AgriShock records
+the computed 64-character hash above. The preservation manifest records that
+these were manually retrieved in WSL before Phase 13C continuation; an exact
+download timestamp was not available and is not invented.
+
+The NWIC feature declares `urn:ogc:def:crs:EPSG::7755`, a projected WGS 84 /
+India NSF Lambert Conformal Conic coordinate system. The pipeline requires
+WGS84 GeoJSON, so `geospatial.boundaries.extract_vellore_boundary` transforms
+the source using EPSG:7755's inverse LCC (2SP) parameters to EPSG:4326. The
+result is structurally checked for finite coordinates, closed rings,
+self-intersections, and WGS84 bounds. The output is a **district reference
+polygon**, not observed flood geometry and not a claim that all of Vellore was
+inundated.
+
+The reviewed NRSC extraction and its replayable output were created locally.
+To reproduce the conversion:
 
 ```powershell
 wsl.exe -d Ubuntu -- bash -lc 'cd /mnt/c/Users/shrey/Documents/Codex/2026-08-29/hi/outputs/agri-shock && . .venv-wsl/bin/activate && python -m agri_shock.ingestion.historical_environment data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore-extract.json --output data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.replayed.ndjson --manifest data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.manifest.json'
@@ -73,7 +89,8 @@ mirror, a CAPTCHA bypass, or a hand-drawn geometry.
 
 ## Completion gate
 
-The adapter and bounded market reference are ready. Phase 13C remains
-incomplete until the official NRSC and NWIC artifacts are actually preserved,
-their SHA-256 values recorded, the NWIC feature schema/CRS is checked, and the
-Vellore boundary is validated before conversion into the Delta reference input.
+Phase 13C is complete: real-source environmental evidence, bounded market
+identity, reviewed extraction, canonical replay event, and WGS84 district
+reference were all produced without market-shock analysis. A future Phase 13D
+must load the bounded WGS84 boundary into the Delta reference contract and
+create any control-market references before conducting a price/event study.

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import json
 
 import pytest
 
@@ -14,6 +15,12 @@ from agri_shock.ingestion.historical_environment import (
     normalize_ndem_district_flood,
 )
 from agri_shock.ingestion.normalizers import NormalizationError
+from agri_shock.geospatial.boundaries import (
+    BoundaryValidationError,
+    NWIC_SOURCE_CRS,
+    extract_vellore_boundary,
+    inverse_epsg_7755,
+)
 
 
 def ndem_record(**overrides: str) -> dict[str, str]:
@@ -106,3 +113,39 @@ def test_case_market_reference_rejects_ambiguous_or_unsupported_evidence() -> No
     snapshot["markets"][0]["evidence_url"] = "https://example.com/market"  # type: ignore[index]
     with pytest.raises(CaseReferenceError, match="unsupported_market_evidence_url"):
         validate_case_market_snapshot(snapshot)
+
+
+def test_epsg_7755_false_origin_transforms_to_declared_wgs84_origin() -> None:
+    longitude, latitude = inverse_epsg_7755(4_000_000, 4_000_000)
+    assert longitude == pytest.approx(80.0, abs=1e-10)
+    assert latitude == pytest.approx(24.0, abs=1e-10)
+
+
+def test_nwic_vellore_extractor_transforms_and_preserves_boundary_provenance(tmp_path: Path) -> None:
+    source = tmp_path / "districts.geojson"
+    source.write_text(json.dumps({"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": NWIC_SOURCE_CRS}}, "features": [{
+        "type": "Feature", "properties": {
+            "id": 569, "objectid": 569, "state": "TN", "stcode": "33", "district": "Vellore",
+            "dtcode": "595", "src_agency": "Survey of India (SOI)", "state_name": "Tamil Nadu",
+        },
+        "geometry": {"type": "MultiPolygon", "coordinates": [[[
+            [4_000_000, 4_000_000], [4_000_100, 4_000_000], [4_000_100, 4_000_100],
+            [4_000_000, 4_000_000],
+        ]]]},
+    }]}), encoding="utf-8")
+    output = tmp_path / "vellore.geojson"
+    result = extract_vellore_boundary(source, "b" * 64, output)
+    written = json.loads(output.read_text(encoding="utf-8"))
+    properties = written["features"][0]["properties"]
+    assert result.district_id == "in:tn:vellore"
+    assert result.source_crs == NWIC_SOURCE_CRS
+    assert result.target_crs == "EPSG:4326"
+    assert properties["not_flood_footprint"] is True
+    assert properties["source_zip_sha256"] == "b" * 64
+    assert written["features"][0]["geometry"]["coordinates"][0][0][0] == pytest.approx([80.0, 24.0], abs=1e-10)
+
+
+def test_nwic_vellore_extractor_rejects_invalid_source_hash(tmp_path: Path) -> None:
+    source = tmp_path / "unread.geojson"
+    with pytest.raises(BoundaryValidationError, match="invalid_source_zip_sha256"):
+        extract_vellore_boundary(source, "not-a-hash", tmp_path / "out.geojson")

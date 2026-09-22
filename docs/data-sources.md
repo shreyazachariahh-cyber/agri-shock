@@ -273,11 +273,13 @@ the reported district and raw area measurement without manufacturing geometry,
 an alert level, or a model severity.
 
 The official NWIC-published GSI District Boundary GeoJSON is the candidate
-boundary source. It must be downloaded unchanged to `data/local`, checksummed,
-and inspected for actual field schema and CRS before any Vellore geometry is
-accepted into `DISTRICT_BOUNDARY_PATH`. A source page is not treated as an
-artifact. This requirement remains in force if local network or WSL access
-prevents retrieval.
+boundary source. Phase 13C subsequently preserved the official ZIP locally,
+verified its SHA-256, and programmatically inspected the 733-feature GeoJSON.
+The unique `Tamil Nadu` / `Vellore` MultiPolygon has source feature `id=569`,
+state code `33`, district code `595`, and source agency `Survey of India
+(SOI)`. Its declared EPSG:7755 coordinates are explicitly transformed to the
+pipeline's WGS84 GeoJSON representation; no coordinates are merely relabelled.
+A source page is never treated as an artifact.
 
 The only market reference admitted in Phase 13C is the versioned,
 case-scoped `Tamil Nadu → Vellore → Vellore APMC` snapshot. Its evidence is an
