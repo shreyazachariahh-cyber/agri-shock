@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import csv
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -114,6 +114,50 @@ def coverage_by_variety(events: Iterable[EventEnvelope]) -> dict[str, dict[str, 
     return {variety: {"observation_count": len(dates), "unique_dates": len(set(dates)), "earliest_date": min(dates), "latest_date": max(dates)} for variety, dates in sorted(values.items())}
 
 
+def audit_batch(
+    report_files: Iterable[Path], *, reference: tuple[Mapping[str, Any], ...],
+    target_market: str, target_commodity: str, required_price_unit: str,
+    pre_event_end: date, known_no_data_dates: Iterable[date] = (),
+) -> dict[str, Any]:
+    """Audit a predeclared report batch without inspecting price outcomes.
+
+    Raw-file hashes are used only to prevent an identical downloaded report
+    from inflating coverage.  A report with no target row is retained as a
+    target-series availability gap; it is not a fabricated zero observation.
+    """
+    seen_hashes: set[str] = set()
+    imported: list[tuple[Path, ParsedReport, ImportResult]] = []
+    duplicate_files: list[str] = []
+    for path in sorted(report_files):
+        digest = sha256(path.read_bytes()).hexdigest()
+        if digest in seen_hashes:
+            duplicate_files.append(str(path))
+            continue
+        seen_hashes.add(digest)
+        report = parse_state_daily_report(path.read_text(encoding="utf-8"))
+        imported.append((path, report, import_report(report, reference=reference, target_market=target_market, target_commodity=target_commodity, required_price_unit=required_price_unit)))
+    events = tuple(event for _, _, result in imported for event in result.events)
+    coverage = sorted(
+        [{"market": event.payload["market"], "commodity": event.payload["commodity"], "variety": event.payload["variety"], "price_unit": event.payload["price_unit"], "observation_date": event.event_time.date().isoformat()} for event in events],
+        key=lambda row: (str(row["observation_date"]), str(row["variety"])),
+    )
+    pre_events = tuple(event for event in events if event.event_time.date() < pre_event_end)
+    return {
+        "target": {"market": target_market, "commodity": target_commodity, "price_unit": required_price_unit},
+        "pre_event_end_exclusive": pre_event_end.isoformat(),
+        "represented_source_dates": [report.arrival_date for _, report, _ in imported],
+        "known_no_data_dates": sorted(item.isoformat() for item in known_no_data_dates),
+        "reports_without_target_rows": [report.arrival_date for _, report, result in imported if not result.selected_rows],
+        "duplicate_raw_files_excluded": duplicate_files,
+        "total_target_rows": sum(len(result.selected_rows) for _, _, result in imported),
+        "accepted_rows": len(events),
+        "rejected_rows": sum(len(result.rejected) for _, _, result in imported),
+        "coverage": coverage,
+        "coverage_by_variety": coverage_by_variety(events),
+        "pre_event_coverage_by_variety": coverage_by_variety(pre_events),
+    }
+
+
 def write_import_artifacts(result: ImportResult, report_file: Path, output_dir: Path, *, target_market: str, target_commodity: str, required_price_unit: str, retrieved_at: datetime) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     digest = sha256(report_file.read_bytes()).hexdigest()
@@ -131,15 +175,34 @@ def write_import_artifacts(result: ImportResult, report_file: Path, output_dir: 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import a manually exported official AGMARKNET State daily report")
-    parser.add_argument("--report-file", required=True, type=Path)
+    parser.add_argument("--report-file", type=Path)
+    parser.add_argument("--report-glob")
     parser.add_argument("--market-reference", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--target-market", required=True)
     parser.add_argument("--target-commodity", required=True)
     parser.add_argument("--price-unit", default="Rs./Quintal")
+    parser.add_argument("--pre-event-end", type=date.fromisoformat)
+    parser.add_argument("--known-no-data-date", action="append", type=date.fromisoformat, default=[])
     args = parser.parse_args()
+    if bool(args.report_file) == bool(args.report_glob):
+        parser.error("provide exactly one of --report-file or --report-glob")
+    reference = load_case_market_snapshot(args.market_reference)
+    if args.report_glob:
+        if args.pre_event_end is None:
+            parser.error("--pre-event-end is required with --report-glob")
+        files = tuple(Path().glob(args.report_glob))
+        if not files:
+            parser.error("--report-glob matched no files")
+        audit = audit_batch(files, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, pre_event_end=args.pre_event_end, known_no_data_dates=args.known_no_data_date)
+        output = args.output_dir / "agmarknet-state-daily-batch-coverage.json"
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(audit, indent=2, sort_keys=True), encoding="utf-8")
+        print(json.dumps({"coverage_file": str(output), **audit}, indent=2, sort_keys=True))
+        return
+    assert args.report_file is not None
     report = parse_state_daily_report(args.report_file.read_text(encoding="utf-8"))
-    result = import_report(report, reference=load_case_market_snapshot(args.market_reference), target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit)
+    result = import_report(report, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit)
     paths = write_import_artifacts(result, args.report_file, args.output_dir, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, retrieved_at=datetime.now(timezone.utc))
     print(json.dumps({**paths, "accepted_rows": len(result.events), "rejected_rows": len(result.rejected), "variety_coverage": coverage_by_variety(result.events)}, indent=2, sort_keys=True))
 

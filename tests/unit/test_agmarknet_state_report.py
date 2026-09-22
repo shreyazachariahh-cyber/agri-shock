@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from agri_shock.geospatial.case_reference import validate_case_market_snapshot
-from agri_shock.ingestion.agmarknet_state_report import import_report, parse_state_daily_report
+from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report
 
 CSV = '''"Market-wise, Commodity-wise Daily Report for a State/UT on 04-Dec-2023 State/UT : Tamil Nadu"
 
@@ -39,3 +39,18 @@ def test_import_rejects_incompatible_unit_without_a_synthetic_conversion() -> No
     result = import_report(report, reference=_reference(), target_market="Vellore APMC", target_commodity="Paddy(Common)", required_price_unit="Rs./Quintal")
     assert len(result.events) == 1
     assert result.rejected[0]["reason"] == "incompatible_price_unit"
+
+
+def test_batch_audit_preserves_target_availability_gaps_and_excludes_duplicate_files(tmp_path) -> None:
+    present = tmp_path / "present.csv"
+    duplicate = tmp_path / "duplicate.csv"
+    absent = tmp_path / "absent.csv"
+    present.write_text(CSV, encoding="utf-8")
+    duplicate.write_text(CSV, encoding="utf-8")
+    absent.write_text(CSV.replace("Vellore APMC", "Other APMC"), encoding="utf-8")
+    audit = audit_batch((present, duplicate, absent), reference=_reference(), target_market="Vellore APMC", target_commodity="Paddy(Common)", required_price_unit="Rs./Quintal", pre_event_end=date(2023, 12, 3), known_no_data_dates=(date(2023, 12, 6),))
+    assert audit["accepted_rows"] == 2
+    assert audit["reports_without_target_rows"] == ["04/12/2023"]
+    assert audit["known_no_data_dates"] == ["2023-12-06"]
+    assert len(audit["duplicate_raw_files_excluded"]) == 1
+    assert audit["pre_event_coverage_by_variety"] == {}
