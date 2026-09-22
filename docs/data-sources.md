@@ -261,3 +261,27 @@ Each adapter exposes `fetch()`, `normalize()`, and `validate()`; it emits raw
 payload metadata and a stable source fingerprint. If a source is inaccessible,
 the adapter fails visibly and a fixture must be declared `replayed_historical`
 or `synthetic_failure_injection`—never presented as live data.
+
+## Phase 13C bounded real environmental source policy
+
+For the selected Tamil Nadu / Cyclone Michaung / Vellore December 2023 case,
+the authoritative environmental evidence is the IMD RSMC Michaung report and
+the NRSC/NDEM rapid flood assessment. The NRSC assessment reports Vellore at
+district level, with a rapid satellite-derived inundated-area estimate; it
+does not provide a reusable Vellore flood polygon. AgriShock therefore stores
+the reported district and raw area measurement without manufacturing geometry,
+an alert level, or a model severity.
+
+The official NWIC-published GSI District Boundary GeoJSON is the candidate
+boundary source. It must be downloaded unchanged to `data/local`, checksummed,
+and inspected for actual field schema and CRS before any Vellore geometry is
+accepted into `DISTRICT_BOUNDARY_PATH`. A source page is not treated as an
+artifact. This requirement remains in force if local network or WSL access
+prevents retrieval.
+
+The only market reference admitted in Phase 13C is the versioned,
+case-scoped `Tamil Nadu → Vellore → Vellore APMC` snapshot. Its evidence is an
+interactive AGMARKNET Market Profile selection, it is not a nationwide master,
+and it must not be generalized to another market or case. Controls remain
+unresolved unless supported by their own official mapping and unaffected-area
+evidence.

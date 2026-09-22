@@ -15,6 +15,17 @@ The Delta input at `MARKET_DIMENSION_PATH` must contain:
 Source display values only resolve through this explicit versioned reference;
 they are not used as analytical joins.
 
+### Bounded case-study references
+
+A case study may ship a small `case-study reference data` snapshot only when
+each State → District → Market relationship has row-level official evidence.
+Its scope, retrieval time, evidence URL, and identifier basis are mandatory.
+Canonical IDs may be deterministic AgriShock IDs when an official identifier
+is not exposed; they must not be represented as government IDs. Exact matching
+and unique State + Market records are required. A bounded snapshot is never a
+nationwide AGMARKNET master and an absent or ambiguous market remains
+unresolved.
+
 ## District boundary dimension
 
 The Delta input at `DISTRICT_BOUNDARY_PATH` must contain `district_id`,

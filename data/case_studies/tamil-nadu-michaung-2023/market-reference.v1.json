@@ -1,0 +1,21 @@
+{
+  "case_study": "tamil-nadu-michaung-2023",
+  "reference_scope": "case-study reference data",
+  "not_a_nationwide_market_master": true,
+  "retrieval_method": "Official AGMARKNET Market Profile interactive State/UT -> District -> Market selection; no CAPTCHA was submitted or bypassed.",
+  "markets": [
+    {
+      "source_state": "Tamil Nadu",
+      "source_district": "Vellore",
+      "source_market": "Vellore APMC",
+      "state_id": "in:tn",
+      "district_id": "in:tn:vellore",
+      "market_id": "in:tn:vellore:vellore-apmc",
+      "canonical_identifier_basis": "AgriShock deterministic identifier; no official market identifier was exposed by the inspected lookup.",
+      "evidence_url": "https://agmarknet.gov.in/viewmarketprofileinputpublic",
+      "retrieved_at": "2026-09-22T15:58:56Z",
+      "evidence_observation": "The official selector listed Vellore APMC after Tamil Nadu and Vellore were selected.",
+      "official_identifier": null
+    }
+  ]
+}
