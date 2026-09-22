@@ -1,7 +1,8 @@
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 from agri_shock.geospatial.case_reference import validate_case_market_snapshot
-from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report
+from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report, write_batch_import_artifacts
 
 CSV = '''"Market-wise, Commodity-wise Daily Report for a State/UT on 04-Dec-2023 State/UT : Tamil Nadu"
 
@@ -54,3 +55,6 @@ def test_batch_audit_preserves_target_availability_gaps_and_excludes_duplicate_f
     assert audit["known_no_data_dates"] == ["2023-12-06"]
     assert len(audit["duplicate_raw_files_excluded"]) == 1
     assert audit["pre_event_coverage_by_variety"] == {}
+    artifacts = write_batch_import_artifacts((present, duplicate, absent), tmp_path / "output", reference=_reference(), target_market="Vellore APMC", target_commodity="Paddy(Common)", required_price_unit="Rs./Quintal", retrieved_at=datetime(2026, 9, 22, tzinfo=timezone.utc))
+    assert len(artifacts) == 2
+    assert all(Path(item["manifest"]).exists() for item in artifacts)

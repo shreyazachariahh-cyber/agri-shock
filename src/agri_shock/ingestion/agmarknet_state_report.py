@@ -158,6 +158,25 @@ def audit_batch(
     }
 
 
+def write_batch_import_artifacts(
+    report_files: Iterable[Path], output_dir: Path, *, reference: tuple[Mapping[str, Any], ...],
+    target_market: str, target_commodity: str, required_price_unit: str,
+    retrieved_at: datetime,
+) -> tuple[dict[str, str], ...]:
+    """Materialize a replay/rejection manifest for every distinct raw report."""
+    seen_hashes: set[str] = set()
+    artifacts: list[dict[str, str]] = []
+    for path in sorted(report_files):
+        digest = sha256(path.read_bytes()).hexdigest()
+        if digest in seen_hashes:
+            continue
+        seen_hashes.add(digest)
+        report = parse_state_daily_report(path.read_text(encoding="utf-8"))
+        result = import_report(report, reference=reference, target_market=target_market, target_commodity=target_commodity, required_price_unit=required_price_unit, retrieved_at=retrieved_at)
+        artifacts.append(write_import_artifacts(result, path, output_dir, target_market=target_market, target_commodity=target_commodity, required_price_unit=required_price_unit, retrieved_at=retrieved_at))
+    return tuple(artifacts)
+
+
 def write_import_artifacts(result: ImportResult, report_file: Path, output_dir: Path, *, target_market: str, target_commodity: str, required_price_unit: str, retrieved_at: datetime) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     digest = sha256(report_file.read_bytes()).hexdigest()
@@ -197,8 +216,9 @@ def main() -> None:
         audit = audit_batch(files, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, pre_event_end=args.pre_event_end, known_no_data_dates=args.known_no_data_date)
         output = args.output_dir / "agmarknet-state-daily-batch-coverage.json"
         args.output_dir.mkdir(parents=True, exist_ok=True)
+        artifacts = write_batch_import_artifacts(files, args.output_dir, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, retrieved_at=datetime.now(timezone.utc))
         output.write_text(json.dumps(audit, indent=2, sort_keys=True), encoding="utf-8")
-        print(json.dumps({"coverage_file": str(output), **audit}, indent=2, sort_keys=True))
+        print(json.dumps({"coverage_file": str(output), "imported_artifacts": list(artifacts), **audit}, indent=2, sort_keys=True))
         return
     assert args.report_file is not None
     report = parse_state_daily_report(args.report_file.read_text(encoding="utf-8"))
