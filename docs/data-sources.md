@@ -183,6 +183,38 @@ case-scoped official Vellore reference supplies district. `ADT 37` and
 source's explicit `Rs./Quintal` rows for this series; it neither combines nor
 converts incompatible rows such as `Rs./Bundle`.
 
+The public report form was re-inspected for the December 2022 acquisition.
+It exposes one State/UT selector and one `date` control; the visible form has
+no range input, bulk-export control, or published date-range request
+contract. The form is session-backed, and the result URL does not identify its
+selected date. Consequently, there is no verified official bulk/range method
+to automate. AgriShock does not derive one from undocumented application
+implementation details.
+
+When official daily CSVs have been downloaded with browser-generated names,
+the batch importer can stage them without manual renaming. It reads each
+internal report title, accepts only Tamil Nadu reports whose internal date is
+within the fixed 01–31 December 2022 window, hashes and copies them to the
+local raw-acquisition directory, deduplicates identical files, withholds
+conflicting files for the same report date, and produces replay artifacts and
+a coverage audit in one command:
+
+```powershell
+& .\.venv\Scripts\python.exe -m agri_shock.ingestion.agmarknet_state_report `
+  --incoming-dir "$HOME\Downloads" `
+  --raw-dir data/local/source-acquisition/agmarknet/tamil-nadu-december-2022/raw `
+  --window-start 2022-12-01 --window-end 2022-12-31 --source-state 'Tamil Nadu' `
+  --market-reference data/case_studies/tamil-nadu-michaung-2023/market-reference.v1.json `
+  --output-dir data/local/source-acquisition/agmarknet/tamil-nadu-december-2022/replay `
+  --target-market 'Vellore APMC' --target-commodity 'Paddy(Common)' `
+  --pre-event-end 2023-12-03
+```
+
+An absent CSV is reported as `missing_report_dates`, meaning **not acquired or
+unavailable**, never silently as a zero-price observation. Only a date for
+which the operator actually saw the official no-data response may be labelled
+with `--known-no-data-date YYYY-MM-DD`.
+
 ### Scoped case-study reference strategy and Phase 13A completion
 
 The general/production ingestion contract is unchanged: source observations

@@ -13,6 +13,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+import shutil
 from typing import Any, Iterable, Mapping
 
 from agri_shock.common.events import EventEnvelope
@@ -177,6 +178,58 @@ def write_batch_import_artifacts(
     return tuple(artifacts)
 
 
+def stage_downloaded_reports(
+    incoming_dir: Path, raw_dir: Path, *, state: str, window_start: date,
+    window_end: date,
+) -> dict[str, Any]:
+    """Discover unrenamed official CSVs and stage only one fixed report window.
+
+    The report's internal title is authoritative for its state and date. Files
+    outside the predeclared window are reported but not copied. An identical
+    hash is a duplicate; conflicting payloads for one report date are withheld
+    rather than arbitrarily choosing one.
+    """
+    if window_end < window_start:
+        raise ValueError("window_end_before_window_start")
+    if not incoming_dir.is_dir():
+        raise ValueError("incoming_dir_not_found")
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    accepted: dict[date, tuple[Path, str, ParsedReport]] = {}
+    ignored: list[dict[str, str]] = []
+    duplicates: list[dict[str, str]] = []
+    conflicts: list[dict[str, str]] = []
+    for path in sorted(incoming_dir.glob("*.csv")):
+        try:
+            report = parse_state_daily_report(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as error:
+            ignored.append({"file": str(path), "reason": str(error)})
+            continue
+        report_date = datetime.strptime(report.arrival_date, "%d/%m/%Y").date()
+        if report.state.strip().casefold() != state.strip().casefold():
+            ignored.append({"file": str(path), "reason": "different_state"})
+            continue
+        if not window_start <= report_date <= window_end:
+            ignored.append({"file": str(path), "reason": "outside_predeclared_window"})
+            continue
+        digest = sha256(path.read_bytes()).hexdigest()
+        previous = accepted.get(report_date)
+        if previous is not None:
+            if previous[1] == digest:
+                duplicates.append({"file": str(path), "duplicate_of": str(previous[0]), "sha256": digest})
+            else:
+                conflicts.append({"file": str(path), "conflicts_with": str(previous[0]), "report_date": report_date.isoformat()})
+            continue
+        accepted[report_date] = (path, digest, report)
+    staged: list[dict[str, str]] = []
+    for report_date, (path, digest, _) in sorted(accepted.items()):
+        destination = raw_dir / f"agmarknet-{state.lower().replace(' ', '-')}-{report_date.isoformat()}-{digest[:16]}.csv"
+        if not destination.exists():
+            shutil.copy2(path, destination)
+        staged.append({"source_file": str(path), "raw_file": str(destination), "report_date": report_date.isoformat(), "sha256": digest})
+    missing_dates = [date.fromordinal(item).isoformat() for item in range(window_start.toordinal(), window_end.toordinal() + 1) if date.fromordinal(item) not in accepted]
+    return {"state": state, "window_start": window_start.isoformat(), "window_end": window_end.isoformat(), "staged_reports": staged, "missing_report_dates": missing_dates, "duplicate_files": duplicates, "conflicting_report_dates": conflicts, "ignored_files": ignored}
+
+
 def write_import_artifacts(result: ImportResult, report_file: Path, output_dir: Path, *, target_market: str, target_commodity: str, required_price_unit: str, retrieved_at: datetime) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     digest = sha256(report_file.read_bytes()).hexdigest()
@@ -196,6 +249,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import a manually exported official AGMARKNET State daily report")
     parser.add_argument("--report-file", type=Path)
     parser.add_argument("--report-glob")
+    parser.add_argument("--incoming-dir", type=Path)
+    parser.add_argument("--raw-dir", type=Path)
+    parser.add_argument("--window-start", type=date.fromisoformat)
+    parser.add_argument("--window-end", type=date.fromisoformat)
+    parser.add_argument("--source-state")
     parser.add_argument("--market-reference", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--target-market", required=True)
@@ -204,9 +262,22 @@ def main() -> None:
     parser.add_argument("--pre-event-end", type=date.fromisoformat)
     parser.add_argument("--known-no-data-date", action="append", type=date.fromisoformat, default=[])
     args = parser.parse_args()
-    if bool(args.report_file) == bool(args.report_glob):
-        parser.error("provide exactly one of --report-file or --report-glob")
+    source_count = sum(item is not None for item in (args.report_file, args.report_glob, args.incoming_dir))
+    if source_count != 1:
+        parser.error("provide exactly one of --report-file, --report-glob, or --incoming-dir")
     reference = load_case_market_snapshot(args.market_reference)
+    if args.incoming_dir:
+        if not all((args.raw_dir, args.window_start, args.window_end, args.source_state, args.pre_event_end)):
+            parser.error("--incoming-dir requires --raw-dir, --window-start, --window-end, --source-state, and --pre-event-end")
+        staging = stage_downloaded_reports(args.incoming_dir, args.raw_dir, state=args.source_state, window_start=args.window_start, window_end=args.window_end)
+        staged_files = tuple(Path(item["raw_file"]) for item in staging["staged_reports"])
+        audit = audit_batch(staged_files, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, pre_event_end=args.pre_event_end, known_no_data_dates=args.known_no_data_date)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        artifacts = write_batch_import_artifacts(staged_files, args.output_dir, reference=reference, target_market=args.target_market, target_commodity=args.target_commodity, required_price_unit=args.price_unit, retrieved_at=datetime.now(timezone.utc))
+        output = args.output_dir / "agmarknet-state-daily-batch-coverage.json"
+        output.write_text(json.dumps({"staging": staging, "audit": audit}, indent=2, sort_keys=True), encoding="utf-8")
+        print(json.dumps({"coverage_file": str(output), "staging": staging, "imported_artifacts": list(artifacts), "audit": audit}, indent=2, sort_keys=True))
+        return
     if args.report_glob:
         if args.pre_event_end is None:
             parser.error("--pre-event-end is required with --report-glob")

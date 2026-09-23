@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from agri_shock.geospatial.case_reference import validate_case_market_snapshot
-from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report, write_batch_import_artifacts
+from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report, stage_downloaded_reports, write_batch_import_artifacts
 
 CSV = '''"Market-wise, Commodity-wise Daily Report for a State/UT on 04-Dec-2023 State/UT : Tamil Nadu"
 
@@ -58,3 +58,21 @@ def test_batch_audit_preserves_target_availability_gaps_and_excludes_duplicate_f
     artifacts = write_batch_import_artifacts((present, duplicate, absent), tmp_path / "output", reference=_reference(), target_market="Vellore APMC", target_commodity="Paddy(Common)", required_price_unit="Rs./Quintal", retrieved_at=datetime(2026, 9, 22, tzinfo=timezone.utc))
     assert len(artifacts) == 2
     assert all(Path(item["manifest"]).exists() for item in artifacts)
+
+
+def test_staging_uses_internal_report_date_and_reports_missing_window_dates(tmp_path) -> None:
+    incoming, raw = tmp_path / "Downloads", tmp_path / "raw"
+    incoming.mkdir()
+    first = incoming / "download.csv"
+    duplicate = incoming / "download (1).csv"
+    out_of_window = incoming / "old.csv"
+    december = CSV.replace("04-Dec-2023", "02-Dec-2022")
+    first.write_text(december, encoding="utf-8")
+    duplicate.write_text(december, encoding="utf-8")
+    out_of_window.write_text(CSV, encoding="utf-8")
+    staged = stage_downloaded_reports(incoming, raw, state="Tamil Nadu", window_start=date(2022, 12, 1), window_end=date(2022, 12, 3))
+    assert [item["report_date"] for item in staged["staged_reports"]] == ["2022-12-02"]
+    assert staged["missing_report_dates"] == ["2022-12-01", "2022-12-03"]
+    assert len(staged["duplicate_files"]) == 1
+    assert staged["ignored_files"][0]["reason"] == "outside_predeclared_window"
+    assert Path(staged["staged_reports"][0]["raw_file"]).exists()
