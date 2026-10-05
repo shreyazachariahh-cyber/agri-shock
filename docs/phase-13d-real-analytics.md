@@ -69,5 +69,32 @@ schema, deterministic `(shock_id, price_event_id)` identity, Delta MERGE, and
 Elasticsearch `_id=signal_id`; replays therefore do not create duplicate
 serving rows.
 
-The exact live commands are supplied in the Phase 13D report. No live Kafka,
-Spark, Delta, or Elasticsearch run was performed while producing this document.
+## Live validation evidence
+
+The real historical validation was run in WSL on 05 Oct 2026 using the bounded
+case reference dimensions and the preserved local artifacts. Kafka accepted the
+replayed historical flood event and 95 mandi observations. The streaming query
+persisted 96 Bronze records, 95 Silver mandi records, and one Silver flood
+record. A direct Delta inspection then found **11** Gold shock-price
+associations; these are distinct price-event associations, not 11 final
+signals.
+
+The real Gold materializer persisted exactly one row for
+`70ad06f7c3b849dd56b870c77f9dff20d187c802ec2d6c0eea7374f92b9e6c79` and
+indexed that same ID into Elasticsearch. The serving index contained two
+different documents: the real Vellore signal and the pre-existing labelled
+synthetic smoke signal `d63e43c17095a70ff7628fb416598be085adb0bad6c9fd861e598db8dacdf68c`.
+That is expected shared-index state, not a duplicated real signal.
+
+An earlier `runtime.health` read showed zero Gold associations while the
+association streaming sink was still catching up. A later direct Delta read
+showed 11. `runtime.health` is deliberately a read-only point-in-time snapshot,
+not a completion barrier; operators should run it after Spark progress has
+settled or use the deterministic real-case verifier for the target Gold and
+Elasticsearch identity. No health-counting defect or replay duplication was
+found.
+
+The exact live commands are supplied in the Phase 13D report. This validation
+confirms delivery mechanics and analytical reproducibility; it does not turn
+the LOW signal into causal evidence of flooding, farmer distress, or market
+misconduct.
