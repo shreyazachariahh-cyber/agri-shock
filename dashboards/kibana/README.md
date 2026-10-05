@@ -1,36 +1,52 @@
-# Kibana dashboard specification
+# Kibana dashboards
 
-Dashboard name: **AgriShock — market shock signal explorer (synthetic demo)**
+## Primary dashboard: real historical case
 
-Before building panels, create a data view named `agrishock-signals` over
-`agrishock-market-shock-signals-*` with `event_time` as the time field. Apply
-the pinned filter `fixture_kind: synthetic_demo` for the committed demo data.
+[`agri_shock_real_historical.ndjson`](agri_shock_real_historical.ndjson) is a
+version-controlled Kibana 8.15 saved-object bundle. Its primary dashboard is
+**AgriShock — Vellore real historical case**.
 
-## Panels
+It pins both `fixture_kind: replayed_historical` and the verified Vellore
+signal ID `70ad06f7c3b849dd56b870c77f9dff20d187c802ec2d6c0eea7374f92b9e6c79`.
+This prevents the existing `synthetic_demo` Dhemaji smoke record from appearing
+as real evidence. The data view targets `agrishock-market-shock-signals-*`,
+using `event_time` as its time field.
 
-| Panel | Kibana visualization | Question answered | Configuration |
-|---|---|---|---|
-| Signal map | Maps / documents layer | Where are the replayed signals? | `location`; color by max `signal_strength`; tooltip state, district, commodity, level, confidence; never infer affected people from a point. |
-| Active high signals | Metric + filter | Which contexts exceed the configured HIGH threshold? | Count where `signal_level: HIGH`; show `fixture_kind` beside it. |
-| Signal ranking | Lens horizontal bar | Which district/commodity combinations have the largest signal strength? | Terms `district`, split by `commodity`; max `signal_strength`; filter out `INSUFFICIENT_EVIDENCE`. |
-| Price vs baseline | Lens table | Is an observed price below its baseline in the replay? | Rows district/commodity; columns observed, baseline, deviation and robust z-score. |
-| Shock timeline | Lens line/bar | How close is the price event to the shock time? | Time `event_time`, break down `shock_type`, metric max `signal_strength`. |
-| Control comparison | Lens table | Does the local change differ from controls in the replay? | district, commodity, `control_difference_pct`, `deviation_pct`. |
-| Explanation inspector | Discover saved search | Why did this record receive this level? | Include component scores, `data_confidence.value`, reasons, source references, and scenario note. |
+Panels cover case/provenance, signal strength, confidence, observed price,
+baseline median, deviation, robust anomaly, the conservative LOW-result
+explanation, and recorded pipeline evidence. The association count is an
+annotated Phase 13D validation result, not a fabricated live metric.
 
-## Guardrails
+## Provisioning
 
-- Keep `fixture_kind` visible in the dashboard title or a Markdown panel.
-- Do not title any panel “farmer distress,” “exploitation,” or “impact.”
-- Display `data_confidence.value` and its reasons beside `signal_strength`.
-- A map point represents a demo market coordinate, not a validated event extent
-  or population impact.
+With Kibana running locally, validate then provision the bundle:
 
-## Index mapping
+```powershell
+python scripts/provision_kibana_dashboard.py --validate-only
+python scripts/provision_kibana_dashboard.py --url http://localhost:5601
+```
 
-The indexer creates `agrishock-market-shock-signals-v1` from the strict
-versioned mapping in
-[`src/agri_shock/elasticsearch/indexer.py`](../../src/agri_shock/elasticsearch/indexer.py).
-It maps `location` as `geo_point`, all identifiers/levels as `keyword`, event
-times as `date`, numeric analytical fields as `double`, and component scores
-as `flattened`.
+The script uses Kibana's saved-object API with explicit object IDs and
+`overwrite=true`, so rerunning it updates the version-controlled bundle rather
+than creating anonymous duplicates. It does not import Elasticsearch documents
+or modify Gold data.
+
+Open Kibana and select **Dashboard → AgriShock — Vellore real historical
+case**. Retain its default Dec 2023 time range and pinned real-historical
+filter.
+
+## Synthetic technical demo
+
+The existing synthetic fixture remains available for a separate technical
+demo: [demo runbook](../../docs/demo-runbook.md). It must use
+`fixture_kind: synthetic_demo` and be labelled **Synthetic demo data — not a
+real market finding**. Do not combine it with the primary real-case dashboard.
+
+## Interpretation guardrails
+
+- The Vellore district polygon is reference geography, not a flood footprint.
+- NRSC/NDEM's 144 ha is observed inundation, not normalized severity.
+- The positive price movement and robust anomaly do not establish causality or
+  farmer distress.
+- LOW is intentional: no price decline, no normalized severity contribution,
+  and no authoritative control comparison.

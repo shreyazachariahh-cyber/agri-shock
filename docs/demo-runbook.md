@@ -48,9 +48,9 @@ not available.
 
 ## Run locally
 
-1. Use Python 3.11 and Java 17 for the full Spark runtime. Docker was not
-   available on the authoring host, so these service steps are documented but
-   not claimed as locally verified.
+1. Use Python 3.11 and Java 17 for the full Spark runtime. This synthetic
+   fixture remains separate from the Phase 13D replayed-historical Vellore
+   validation and its primary dashboard.
 2. Copy `.env.example` to `.env`, set the Kafka/Spark reference-data variables
    required for streaming, and start the observability services:
 

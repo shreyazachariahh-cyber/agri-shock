@@ -48,6 +48,8 @@ Detailed guarantees and limitations are in [reliability and replay](docs/reliabi
 For a Windows PowerShell synthetic-stack run covering Kafka → Spark → Delta →
 Elasticsearch → Kibana, follow [the runtime validation runbook](docs/runtime-validation.md).
 It does not claim that the fixture represents real agricultural observations.
+For the separately validated Vellore historical case and its Kibana experience,
+use [the Phase 14 dashboard guide](docs/phase-14-dashboard-demo.md).
 
 ## Engineering model
 
@@ -97,6 +99,11 @@ in-memory sink for local validation. Kafka delivery requires the optional
 
 ## Recruiter demo
 
+The primary recruiter walkthrough is the source-attributed, bounded Vellore /
+Cyclone Michaung replayed-historical case. Provision its Kibana saved-object
+bundle using [the dashboard guide](docs/phase-14-dashboard-demo.md). It stays
+explicitly scoped to one case and does not support causal claims.
+
 Run the [end-to-end demo](docs/demo-runbook.md) to index a multi-state,
 synthetic historical-context fixture into Elasticsearch and explore it in
 Kibana. It covers Assam and Bihar floods, Kerala flood context, Maharashtra
@@ -112,7 +119,8 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Engineering decisions](docs/engineering-decisions.md)
 - [Market shock signal methodology](docs/signal-methodology.md)
 - [Recruiter demo runbook](docs/demo-runbook.md)
-- [Kibana dashboard specification](dashboards/kibana/README.md)
+- [Kibana dashboards](dashboards/kibana/README.md)
+- [Phase 14 real-case dashboard and walkthrough](docs/phase-14-dashboard-demo.md)
 - [Delta medallion architecture](docs/medallion-architecture.md)
 - [Windows runtime validation](docs/runtime-validation.md)
 - [Reliability and replay](docs/reliability-and-replay.md)
