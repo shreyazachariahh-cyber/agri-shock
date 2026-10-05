@@ -66,7 +66,7 @@ Provision locally:
 
 ```powershell
 python scripts/provision_kibana_dashboard.py --validate-only
-python scripts/provision_kibana_dashboard.py --url http://localhost:5601
+python scripts/provision_kibana_dashboard.py --url http://localhost:5601 --dark-appearance
 ```
 
 Open <http://localhost:5601> and select **AgriShock — Vellore real historical case**. See the [dashboard walkthrough](docs/phase-14-dashboard-demo.md).

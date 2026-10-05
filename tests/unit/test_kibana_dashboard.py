@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts.provision_kibana_dashboard import load_objects, provision, validate_bundle
+from scripts.provision_kibana_dashboard import load_objects, provision, set_dark_appearance, validate_bundle
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,7 +19,12 @@ def test_real_historical_dashboard_bundle_is_valid_and_pinned() -> None:
     visualizations = {item["id"]: item for item in objects if item["type"] == "visualization"}
     assert "# LOW" in visualizations["agrishock-real-signal-status"]["attributes"]["visState"]
     assert "# 11" in visualizations["agrishock-real-association-evidence"]["attributes"]["visState"]
-    assert "₹2,993 observed" in visualizations["agrishock-real-price-comparison"]["attributes"]["visState"]
+    price_chart = visualizations["agrishock-real-price-comparison"]["attributes"]["visState"]
+    assert '"type":"vega"' in price_chart
+    assert "Historical median" in price_chart
+    assert "Observed price" in price_chart
+    assert "baseline_price" in price_chart
+    assert "observed_price" in price_chart
 
 
 def test_dashboard_metric_panels_use_supported_gold_fields() -> None:
@@ -70,3 +75,29 @@ def test_provision_uses_stable_saved_object_ids(monkeypatch) -> None:
     assert all(request.method == "POST" for request, _timeout in requests)
     assert all("overwrite=true" in request.full_url for request, _timeout in requests)
     assert all(request.headers["Kbn-xsrf"] == "agrishock-dashboard-provisioner" for request, _timeout in requests)
+
+
+def test_dark_appearance_uses_kibanas_supported_settings_api(monkeypatch) -> None:
+    request_log = []
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    def fake_urlopen(request, timeout):
+        request_log.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr("scripts.provision_kibana_dashboard.urlopen", fake_urlopen)
+    set_dark_appearance("http://kibana.test/")
+
+    request, timeout = request_log[0]
+    assert timeout == 15
+    assert request.full_url == "http://kibana.test/api/kibana/settings"
+    assert request.method == "POST"
+    assert request.data == b'{"changes": {"theme:darkMode": "enabled"}}'

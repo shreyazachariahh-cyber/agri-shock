@@ -21,21 +21,28 @@ and recorded pipeline evidence. The association count is an annotated Phase
 
 ## Provisioning
 
-With Kibana running locally, validate then provision the bundle:
+With Kibana running locally, validate then provision the bundle in Kibana's
+supported local dark appearance:
 
 ```powershell
 python scripts/provision_kibana_dashboard.py --validate-only
-python scripts/provision_kibana_dashboard.py --url http://localhost:5601
+python scripts/provision_kibana_dashboard.py --url http://localhost:5601 --dark-appearance
 ```
 
 The script uses Kibana's saved-object API with explicit object IDs and
 `overwrite=true`, so rerunning it updates the version-controlled bundle rather
 than creating anonymous duplicates. It does not import Elasticsearch documents
-or modify Gold data.
+or modify Gold data. `--dark-appearance` changes only Kibana's supported local
+user preference (`theme:darkMode`); it is not encoded in the dashboard object.
 
 Open Kibana and select **Dashboard → AgriShock — Vellore real historical
 case**. Retain its default Dec 2023 time range and pinned real-historical
 filter.
+
+The dashboard's categorical price comparison is a Kibana Vega visualization.
+It queries the pinned real Gold signal's `baseline_price` and `observed_price`
+fields and renders two bars—**Historical median** and **Observed price**. It
+does not manufacture a time series or additional observations.
 
 ## Synthetic technical demo
 

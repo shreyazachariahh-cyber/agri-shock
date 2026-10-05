@@ -17,9 +17,9 @@ Synthetic smoke data is excluded by default.
 
 | Panel | Purpose |
 |---|---|
-| Header | AgriShock, Vellore, Cyclone Michaung, December 2023, and replayed-historical provenance. |
+| Header | AgriShock, Agricultural Market-Shock Early Warning, Vellore, Cyclone Michaung, December 2023, and replayed-historical provenance. |
 | Status / strength / confidence / associations | Makes LOW, 9.29 strength, 87.5% confidence, and 11 verified associations immediately visible. |
-| Observed versus baseline | Compares ₹2,993 observed with ₹1,851 historical median from the 22-observation fixed baseline. |
+| Observed versus baseline | A real Elasticsearch-backed Vega categorical bar chart compares ₹2,993 observed with ₹1,851 historical median from the 22-observation fixed baseline. |
 | Price movement / historical unusualness | Shows +61.7% and +6.37 as unusual movement, not distress proof. |
 | LOW explanation | Makes absent decline, normalized severity, and control explicit. |
 | Pipeline evidence | Records 96 Bronze, 95 Silver mandi, 1 Silver flood, 11 associations, one Gold signal. |
@@ -32,13 +32,15 @@ coordinate. Runtime-health counts are not fabricated as live Kibana metrics.
 
 ```powershell
 python scripts/provision_kibana_dashboard.py --validate-only
-python scripts/provision_kibana_dashboard.py --url http://localhost:5601
+python scripts/provision_kibana_dashboard.py --url http://localhost:5601 --dark-appearance
 ```
 
 The provisioner is idempotent at saved-object identity level. It does not
 alter Elasticsearch signal documents. The compact dashboard layout deliberately
 puts case → signal → observed versus baseline → anomaly → interpretation →
 pipeline evidence in that order; manual panel construction is not required.
+`--dark-appearance` uses Kibana's supported local `theme:darkMode` preference;
+refresh Kibana after changing it.
 
 ## 60–90 second walkthrough
 
