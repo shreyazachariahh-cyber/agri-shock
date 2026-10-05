@@ -35,5 +35,8 @@ the evidence in the engineering decision log.
 - `data/local/delta/silver/flood_events`
 - `data/checkpoints/*`
 
-The actual Spark/Delta/Kafka execution has not been run on the current host
-because its Java, Docker, and Python 3.11 streaming runtime are unavailable.
+The WSL2 Kafka → Spark → Delta → Elasticsearch runtime was live-validated for
+both the synthetic smoke path and the bounded real historical Vellore replay.
+This document remains a generic operator command reference; it does not imply
+that every host has the required Java, Docker, Python 3.11, reference data, or
+source artifacts configured.

@@ -19,10 +19,10 @@
 ## Python 3.12 decision
 
 Spark 3.5.6 documentation states Python 3.8+ support, but its PyPI package
-classifiers list Python through 3.11. The active host has Python 3.12 and it is
-valid for the dependency-light contracts/tests, but the runnable Spark service
-will use Python 3.11. This avoids claiming an unverified 3.12/PySpark/Delta
-combination. The CI matrix will include 3.11 as the required runtime.
+classifiers list Python through 3.11. Dependency-light contracts/tests may run
+under Python 3.12, but the live-validated Spark service uses Python 3.11. This
+avoids claiming a Python 3.12/PySpark/Delta runtime that was not validated. CI
+uses Python 3.11 as the required runtime.
 
 ## Installation boundary
 

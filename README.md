@@ -1,133 +1,144 @@
 # AgriShock
 
-AgriShock is a portfolio-grade, event-time data platform for investigating
-whether an environmental shock is followed by an unusual local mandi price
-movement relative to a historical baseline and comparable markets. Its output
-is a transparent **market shock signal**, never a causal finding.
+**An event-time streaming data platform that associates agricultural market prices with environmental evidence to surface and explain unusual market-price movements and potential distress-sale signals.**
 
-## Scientific limitation
+> AgriShock produces observational market-shock signals—not causal findings. It does not prove farmer distress, flood impact, or trader misconduct.
 
-An alert is an explainable risk signal, not proof that weather or flooding
-caused a price movement, farmer distress, or trader misconduct. Correlation is
-not causation.
+## Why AgriShock?
 
-## Status
+Agricultural prices, weather observations, and flood evidence commonly arrive through disconnected systems, at different times, and with incompatible geographic identifiers. AgriShock treats that as a data-engineering problem: it validates and normalizes source events, preserves provenance, and associates them using event time and authoritative geographic context.
 
-Phase 9 was live-validated in WSL2 with Docker Kafka, Spark Structured
-Streaming, Delta, Elasticsearch, and Kibana. Phase 10 adds replay, DLQ,
-retry, checkpoint, and reference-remediation contracts. Phase 13 validated
-the first bounded real historical case study: Tamil Nadu / Cyclone Michaung /
-Vellore. It is not a Vellore-only product or a causal finding; read the
-[completed real case study](docs/phase-13d-real-analytics.md) and
-[data-source feasibility](docs/data-sources.md) for its evidence and limits.
+The result is an explainable early-warning indicator. A signal can be LOW or have insufficient evidence; that is useful information, not a failure.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  A[Public sources / labelled replay] --> B[Kafka topics]
-  B --> C[Spark Structured Streaming]
-  C --> D[Delta Bronze]
-  D --> E[Delta Silver: validated + canonical geography]
-  E --> F[Delta Gold: shock-price association]
-  F --> G[MarketShockSignal + data confidence]
-  G --> H[Elasticsearch]
-  H --> I[Kibana explorer]
+  A[AGMARKNET / environmental evidence\nlabelled historical replay] --> B[Kafka\nevent transport + replay]
+  B --> C[Spark Structured Streaming\nvalidation · event time · watermarks\nnormalization · temporal association]
+  C --> D[Bronze Delta\nimmutable raw provenance]
+  D --> E[Silver Delta\nvalidated canonical events\ngeography remediation]
+  E --> F[Gold Delta\nshock-price associations\nMarketShockSignal]
+  F --> G[Elasticsearch\nsearch / serving]
+  G --> H[Kibana\nreproducible dashboard]
+  C -. malformed records .-> I[Kafka DLQ + durable Delta DLQ]
+  F -. deterministic IDs / MERGE .-> G
 ```
 
-The demo fixture starts at the Gold-to-Elasticsearch boundary when a full
-source/Spark runtime is unavailable. It is explicitly marked synthetic and is
-not a substitute for source-attributed records.
+Kafka decouples source/replay producers from consumers. Spark owns the streaming transformations; Delta preserves Bronze → Silver → Gold lineage; Elasticsearch and Kibana serve the resulting signal. See the concise [architecture guide](docs/architecture.md) and detailed [medallion contract](docs/medallion-architecture.md).
 
-The physical Delta lineage, deterministic keys, replay behavior, and schema
-evolution policy are described in [the medallion architecture](docs/medallion-architecture.md).
-Detailed guarantees and limitations are in [reliability and replay](docs/reliability-and-replay.md).
+## What makes this a data-engineering project?
 
-## Local runtime validation
+- Kafka topic design, producer retries, offsets, replay, and dead-letter flow.
+- Spark Structured Streaming with explicit schemas, event time, watermarks, deduplication, and temporal association.
+- Canonical geographic IDs and remediation for unresolved mappings—never guessed market/district joins.
+- Delta Bronze/Silver/Gold layers with provenance, deterministic identities, targeted schema evolution, replay-safe MERGE, and checkpoints.
+- Historical median/MAD baselines, robust anomaly evidence, transparent component scoring, and separate signal strength/confidence.
+- Idempotent Elasticsearch documents, version-controlled Kibana provisioning, replay/failure contracts, and automated tests.
 
-For a Windows PowerShell synthetic-stack run covering Kafka → Spark → Delta →
-Elasticsearch → Kibana, follow [the runtime validation runbook](docs/runtime-validation.md).
-It does not claim that the fixture represents real agricultural observations.
-For the separately validated Vellore historical case and its Kibana experience,
-use [the Phase 14 dashboard guide](docs/phase-14-dashboard-demo.md).
+## Real historical validation
 
-## Engineering model
+The first bounded validation case is **Cyclone Michaung / Vellore, Tamil Nadu / December 2023**. It uses preserved official AGMARKNET reports and NRSC/NDEM evidence, replayed through the platform—it was not running live in December 2023.
 
-- **Event time:** watermarks and shock/price association use source event time;
-  ingestion time remains audit metadata.
-- **Geography:** curated IDs and Sedona spatial joins associate events; missing
-  mappings go to remediation tables, never name-based guesses.
-- **Analytics:** a historical baseline, volatility-aware anomaly, and control
-  comparison feed a transparent signal. `signal_strength` and
-  `data_confidence` are intentionally separate.
-- **Reliability:** Bronze preserves raw Kafka deliveries; Silver deduplicates
-  by event ID within watermark/checkpoint state; Gold and Elasticsearch use
-  deterministic IDs for idempotent serving.
+| Evidence | Verified value |
+|---|---|
+| Location / environmental evidence | Vellore, Tamil Nadu · NRSC/NDEM district-reported evidence, 03–07 Dec 2023 |
+| Market series | Vellore APMC · Paddy(Common) · `Other` variety · Rs./Quintal |
+| Historical baseline | 22 observations, 01–31 Dec 2022 · median ₹1,851 · MAD 121 |
+| Target observation | 04 Dec 2023 · modal price ₹2,993 |
+| Unusual movement | +61.6964% from baseline · robust z-score +6.3659 |
+| Verified associations | 11 distinct shock-price associations |
+| Final signal | **LOW** · 9.29 / 100 strength · 87.5% data confidence |
+| Control / provenance | No authoritative unaffected control · `replayed_historical` |
 
-## Setup and validation
+The observed movement was statistically unusual but **positive**, not a price decline. The 144 ha NRSC/NDEM observation is source evidence, not a normalized severity score; there is also no authoritative control market. The conservative LOW result is therefore correct and intentional. Read the full [real-case evidence and limitations](docs/phase-13d-real-analytics.md).
+
+## Dashboard
+
+The primary Kibana dashboard is version-controlled and pins both `fixture_kind: replayed_historical` and the deterministic Vellore signal ID, so the existing synthetic smoke record cannot appear as real evidence. It shows the case, LOW status, confidence, observed-versus-baseline comparison, anomaly evidence, interpretation, and verified pipeline path.
+
+No screenshot is committed yet. After final human review, capture a genuine
+dashboard hero as `docs/images/vellore-dashboard-hero.png`; the exact safe
+capture checklist is in [docs/images/README.md](docs/images/README.md). Never
+substitute a mockup or a synthetic record for this image.
+
+Provision locally:
+
+```powershell
+python scripts/provision_kibana_dashboard.py --validate-only
+python scripts/provision_kibana_dashboard.py --url http://localhost:5601
+```
+
+Open <http://localhost:5601> and select **AgriShock — Vellore real historical case**. See the [dashboard walkthrough](docs/phase-14-dashboard-demo.md).
+
+## Quick start
+
+### Prerequisites
+
+- Python 3.11
+- Java 17
+- Docker Desktop with WSL2 integration (recommended Spark runtime)
+- Docker Compose
+
+Clone the repository, then from its root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python -m pytest
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,streaming]"
+Copy-Item .env.example .env
+docker compose up -d kafka kafka-init elasticsearch kibana
+docker compose ps
 ```
 
-Copy `.env.example` to `.env` before configuring source credentials. Do not
-commit `.env`.
+For the supported end-to-end synthetic contract path, follow the exact [runtime validation runbook](docs/runtime-validation.md): it prepares local reference dimensions, starts Spark in WSL2, publishes labelled synthetic events, materializes Gold, verifies Delta/Elasticsearch, and opens Kibana.
 
-For streaming, use Python 3.11, Java 17, and `pip install -e
-".[dev,streaming]"`. Start Docker services, run preflight, then follow the
-[runtime validation runbook](docs/runtime-validation.md). The local health
-report and deliberately dispatch-only benchmark are documented in
-[operations](docs/operations.md); benchmark results are not yet measured.
+The bounded real case requires local, gitignored raw official exports and reference artifacts; they are deliberately **not** bundled. Its acquisition, geography, and replay constraints are documented in [data sources](docs/data-sources.md) and the [real-case study](docs/phase-13d-real-analytics.md). Do not treat the synthetic smoke path as real historical evidence.
 
-## Project conventions
+## Testing
 
-- Event time and ingestion time are distinct required fields.
-- Invalid events are designed to become DLQ records with an explicit reason.
-- Replayed historical data and synthetic failure tests are labelled as such.
-- Geography is normalized to canonical IDs, not display-name joins.
+```powershell
+python -m pytest -q
+python -m compileall src tests
+git diff --check
+```
 
-## Replay mode
+The current suite contains **112 tests** spanning schema/data-quality, analytics, replay/idempotency, failure contracts, runtime helpers, and Kibana saved-object validation. CI runs the unit/data-quality/chaos-safe contract suite; live Kafka/Spark/Delta/Elasticsearch validation is documented separately.
 
-Use `python -m agri_shock.ingestion.replay path/to/events.ndjson`. Input must
-explicitly use `replayed_historical` or `synthetic_failure_injection` as its
-source label; original `event_time` is preserved. The current CLI uses an
-in-memory sink for local validation. Kafka delivery requires the optional
-`confluent-kafka` runtime dependency and a reachable broker.
+## Project structure
 
-## Recruiter demo
+```text
+src/agri_shock/       streaming, ingestion, geospatial, analytics, storage, serving
+config/               runtime and policy configuration examples
+data/case_studies/    bounded, versioned case reference metadata
+dashboards/kibana/    reproducible Kibana saved objects and provisioning notes
+docs/                 architecture, operations, methodology, case evidence, guides
+scripts/              Kafka bootstrap and Kibana provisioning
+tests/                unit, data-quality, integration-contract, and chaos tests
+```
 
-The primary recruiter walkthrough is the source-attributed, bounded Vellore /
-Cyclone Michaung replayed-historical case. Provision its Kibana saved-object
-bundle using [the dashboard guide](docs/phase-14-dashboard-demo.md). It stays
-explicitly scoped to one case and does not support causal claims.
+## Scientific scope and limitations
 
-Run the [end-to-end demo](docs/demo-runbook.md) to index a multi-state,
-synthetic historical-context fixture into Elasticsearch and explore it in
-Kibana. It covers Assam and Bihar floods, Kerala flood context, Maharashtra
-drought context, and Himachal Pradesh landslide context across ten distinct
-district/commodity scenarios. The numbers are intentionally synthetic; see
-[fixture provenance](data/sample/README.md).
+- A market-shock signal is observational evidence, not causal proof.
+- The first real validation is one bounded historical replay, not continuous production operation in December 2023.
+- The Vellore association is district-reported; its administrative boundary is not a flood footprint.
+- The case has no authoritative unaffected control market.
+- Price varieties and incompatible units are not pooled.
 
-## Documentation
+## Explore further
 
-- [Source validation](docs/data-sources.md)
 - [Architecture](docs/architecture.md)
-- [Data model](docs/data-model.md)
-- [Engineering decisions](docs/engineering-decisions.md)
-- [Market shock signal methodology](docs/signal-methodology.md)
-- [Recruiter demo runbook](docs/demo-runbook.md)
-- [Kibana dashboards](dashboards/kibana/README.md)
-- [Phase 14 real-case dashboard and walkthrough](docs/phase-14-dashboard-demo.md)
-- [Delta medallion architecture](docs/medallion-architecture.md)
-- [Windows runtime validation](docs/runtime-validation.md)
+- [Real historical case study](docs/phase-13d-real-analytics.md)
+- [Kibana dashboard and walkthrough](docs/phase-14-dashboard-demo.md)
+- [Demo guide](docs/demo-guide.md)
+- [Interview preparation](docs/interview-guide.md)
 - [Reliability and replay](docs/reliability-and-replay.md)
-- [Operations and performance](docs/operations.md)
+- [Data sources and acquisition constraints](docs/data-sources.md)
+- [Runtime validation](docs/runtime-validation.md)
+- [Engineering decisions](docs/engineering-decisions.md)
 - [Limitations](docs/limitations.md)
-- [Completed real historical case study](docs/phase-13d-real-analytics.md)
 
 ## License
 
-To be selected before public publication.
+No license has been selected yet. Choose one before making the repository publicly reusable.

@@ -154,5 +154,7 @@ If Kafka is unreachable, wait for `kafka-init` in `docker compose ps` and use
 verify Spark is running and all environment values match in both terminals. If
 preflight reports `windows-hadoop`, use WSL2 or obtain an organization-approved
 and checksummed helper; do not bypass the check. If imports fail, use Java 17
-and Python 3.11 with `.[streaming]` installed. This host has not live-run the
-stack; unit tests and preflight are not live integration proof.
+and Python 3.11 with `.[streaming]` installed. The synthetic smoke path and
+the separate bounded Vellore replay were live-validated in WSL2; that evidence
+does not make a different host's preflight or unit tests equivalent to live
+integration proof.

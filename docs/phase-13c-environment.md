@@ -77,10 +77,14 @@ polygon**, not observed flood geometry and not a claim that all of Vellore was
 inundated.
 
 The reviewed NRSC extraction and its replayable output were created locally.
-To reproduce the conversion:
+To reproduce the conversion, run this from a WSL clone of the repository:
 
-```powershell
-wsl.exe -d Ubuntu -- bash -lc 'cd /mnt/c/Users/shrey/Documents/Codex/2026-08-29/hi/outputs/agri-shock && . .venv-wsl/bin/activate && python -m agri_shock.ingestion.historical_environment data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore-extract.json --output data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.replayed.ndjson --manifest data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.manifest.json'
+```bash
+. .venv-wsl/bin/activate
+python -m agri_shock.ingestion.historical_environment \
+  data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore-extract.json \
+  --output data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.replayed.ndjson \
+  --manifest data/local/source-acquisition/environment/tamil-nadu-michaung-2023/ndem-vellore.manifest.json
 ```
 
 The download command must use `curl --fail --location` against the exact URLs

@@ -26,8 +26,11 @@ python -m agri_shock.runtime.benchmark --events 10000 --duplicate-every 100 --si
 
 The emitted JSON measures submitted events, elapsed wall time, dispatch
 throughput, and deliberate duplicate count. It does not claim Kafka consumer,
-Spark, Delta, or Elasticsearch end-to-end latency. No benchmark results are
-committed until these commands run in WSL.
+Spark, Delta, or Elasticsearch end-to-end latency. The Phase 11 WSL run
+measured publisher dispatch only: 100 events in 2.363195681 s (42.3156
+events/s), and 10,000 events in 19.174068907 s (521.5377 events/s), with 100
+deliberate duplicates. These are local benchmark observations, not production
+capacity claims.
 
 Likely unmeasured bottlenecks: Kafka partition skew by market, Spark state
 growth from watermark duration, Sedona/reference joins, small Delta files, and

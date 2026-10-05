@@ -92,10 +92,9 @@ Invoke-WebRequest "http://localhost:9200/agrishock-market-shock-signals-v1/_coun
 The expected document count for this fixture is 10. Re-running the indexer
 updates the same stable `signal_id` documents rather than creating duplicates.
 
-## Screenshot checklist
+## Synthetic screenshot checklist
 
-No dashboard screenshot is committed because Kibana was not runnable on this
-host. After completing the local run, capture and add the following PNGs under
+After completing the local run, capture and add the following PNGs under
 `dashboards/screenshots/`:
 
 1. `01-map.png`: map filtered to `fixture_kind: synthetic_demo`, colored by
@@ -106,3 +105,7 @@ host. After completing the local run, capture and add the following PNGs under
    deviation, control difference, component scores, and confidence reasons.
 
 Label every capture **Synthetic demo data — not a real market finding**.
+
+For the primary real-case dashboard, use the distinct capture plan in
+[`docs/images/README.md`](images/README.md). Do not reuse these synthetic
+screenshots in the project landing page.
