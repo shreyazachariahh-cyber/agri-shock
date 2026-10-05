@@ -1,8 +1,34 @@
-# Phase 13D — Vellore real historical analytics
+# Phase 13 — completed real historical case study: Vellore / Cyclone Michaung
 
 This bounded case uses real, manually preserved official AGMARKNET reports and
 NRSC/NDEM evidence. It is a replayed-historical market-shock analysis, not a
 causal finding about flooding, farmer distress, or any participant's conduct.
+
+## Objective and scope
+
+Vellore / Cyclone Michaung is AgriShock's **first real historical validation
+case** for the general platform: it tests source, event-time, geographic,
+Bronze/Silver/Gold, and serving contracts against bounded authoritative
+evidence. AgriShock is not a Vellore-only system. The case was selected for
+source availability, reproducible acquisition, bounded affected geography,
+and variety-specific baseline feasibility—not for a desired price movement or
+signal level.
+
+## Compact result summary
+
+| Field | Verified value |
+|---|---|
+| Case | Tamil Nadu / Cyclone Michaung / Vellore, Dec 2023 |
+| Environmental evidence | NRSC/NDEM source-reported Vellore, 03–07 Dec 2023 |
+| Market series | Vellore APMC / Paddy(Common) / `Other` / Rs./Quintal |
+| Baseline | 01–31 Dec 2022; 22 observations; median 1851.0; MAD 121.0 |
+| Target observation | 04 Dec 2023; 2993.0 Rs./Quintal |
+| Derived movement | +61.6964%; robust z-score +6.3659 |
+| Streaming associations | 11 deterministic flood-price associations |
+| Gold signal | `70ad06f7c3b849dd56b870c77f9dff20d187c802ec2d6c0eea7374f92b9e6c79` |
+| Signal outcome | LOW; 9.29 strength; 0.875 data confidence |
+| Control comparison | unavailable/null; no authoritative unaffected control was captured |
+| Provenance | `replayed_historical` |
 
 ## Fixed study inputs
 
@@ -15,6 +41,10 @@ causal finding about flooding, farmer distress, or any participant's conduct.
   declared and acquired before anomaly results were examined.
 - **Baseline method:** existing same-calendar-month median/MAD contract with a
   minimum of five observations. Varieties and price units are never pooled.
+
+The district boundary is reference geography for canonical association only.
+It is not a flood footprint, and the 144-hectare observed inundation figure is
+not a normalized flood-severity score.
 
 ## Outcome-independent target selection
 
@@ -43,6 +73,11 @@ and MAD **121.0**. The derived percentage deviation is **+61.6964%** and the
 robust z-score is **+6.3659**. These figures describe the series relative to
 its limited historical baseline; they do not indicate a price decline or
 demonstrate a distress sale.
+
+Median is robust to a small number of unusually high or low observed prices;
+MAD is the median absolute distance from that median. The robust z-score uses
+the existing project formula and remains null rather than fabricated when MAD
+is zero. Neither statistic establishes why the price moved.
 
 No authoritative unaffected control market and matching evidence have been
 captured. Therefore `control_difference_pct` remains null and
@@ -98,3 +133,34 @@ The exact live commands are supplied in the Phase 13D report. This validation
 confirms delivery mechanics and analytical reproducibility; it does not turn
 the LOW signal into causal evidence of flooding, farmer distress, or market
 misconduct.
+
+## Interpretation and limitations
+
+The selected event-window observation is an unusual **positive** movement, not
+a price decline. A potential distress-sale signal should not be elevated merely
+because there was an environmental event: price-decline and robust-decline
+components contribute zero here, the 144 ha observation is not coerced into a
+severity score, and no control comparison exists. Temporal proximity alone
+contributes evidence, resulting in the valid LOW outcome.
+
+This is an observational early-warning system. It identifies a market-shock
+signal or evidence warranting further investigation; it does not prove that
+the flood caused a price movement, that farmers were distressed, or that any
+trader acted improperly.
+
+Known scope boundaries are one bounded historical case so far; sparse,
+variety-specific reporting; no authoritative unaffected control market;
+district-reported association rather than flood-footprint intersection; and
+historical replay validation rather than continuous production deployment.
+
+## Reproducing the case
+
+The official source adapters, bounded market reference, environment converter,
+and local-only raw artifacts are described in [data sources](data-sources.md),
+[Phase 13C environmental evidence](phase-13c-environment.md), and the
+[runtime validation runbook](runtime-validation.md). The executable entry
+points are `agri_shock.ingestion.agmarknet_state_report`,
+`agri_shock.ingestion.historical_environment`,
+`agri_shock.runtime.case_references`, and `agri_shock.runtime.real_case`.
+Raw downloads, replay output, Delta tables, checkpoints, and Elasticsearch
+state remain intentionally local and ignored by Git.

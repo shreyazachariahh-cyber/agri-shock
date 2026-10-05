@@ -1,5 +1,9 @@
 # Phase 13D pre-live execution
 
+> Superseded as an execution gate by the successful Phase 13D live validation.
+> This remains a historical pre-live decision record; the authoritative
+> completed narrative is [the real case study](phase-13d-real-analytics.md).
+
 ## District-reported association
 
 NRSC/NDEM's event is now associated through the exact authoritative pair

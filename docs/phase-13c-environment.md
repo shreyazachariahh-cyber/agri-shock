@@ -91,6 +91,7 @@ mirror, a CAPTCHA bypass, or a hand-drawn geometry.
 
 Phase 13C is complete: real-source environmental evidence, bounded market
 identity, reviewed extraction, canonical replay event, and WGS84 district
-reference were all produced without market-shock analysis. A future Phase 13D
-must load the bounded WGS84 boundary into the Delta reference contract and
-create any control-market references before conducting a price/event study.
+reference were all produced without market-shock analysis. Phase 13D
+subsequently loaded the bounded reference into Delta and completed the price /
+event study without introducing a control market. See the
+[completed case study](phase-13d-real-analytics.md).

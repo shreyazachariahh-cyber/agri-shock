@@ -1,5 +1,10 @@
 # Phase 13B — real case-study selection
 
+> Historical selection checkpoint. The selected Vellore case completed live
+> validation in Phase 13D/E; its final metrics and scientific interpretation
+> are in [the completed case study](phase-13d-real-analytics.md). This file
+> preserves the pre-outcome selection rationale.
+
 ## Decision rule
 
 Phase 13B selects a case for reproducibility and analytical feasibility, not

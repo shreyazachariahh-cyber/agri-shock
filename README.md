@@ -15,9 +15,11 @@ not causation.
 
 Phase 9 was live-validated in WSL2 with Docker Kafka, Spark Structured
 Streaming, Delta, Elasticsearch, and Kibana. Phase 10 adds replay, DLQ,
-retry, checkpoint, and reference-remediation contracts. The public-source case
-study remains intentionally unselected until source coverage is verified.
-See [data-source feasibility](docs/data-sources.md).
+retry, checkpoint, and reference-remediation contracts. Phase 13 validated
+the first bounded real historical case study: Tamil Nadu / Cyclone Michaung /
+Vellore. It is not a Vellore-only product or a causal finding; read the
+[completed real case study](docs/phase-13d-real-analytics.md) and
+[data-source feasibility](docs/data-sources.md) for its evidence and limits.
 
 ## Architecture
 
@@ -116,6 +118,7 @@ district/commodity scenarios. The numbers are intentionally synthetic; see
 - [Reliability and replay](docs/reliability-and-replay.md)
 - [Operations and performance](docs/operations.md)
 - [Limitations](docs/limitations.md)
+- [Completed real historical case study](docs/phase-13d-real-analytics.md)
 
 ## License
 
