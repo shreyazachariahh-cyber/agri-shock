@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
+import json
 
 from agri_shock.geospatial.case_reference import validate_case_market_snapshot
 from agri_shock.ingestion.agmarknet_state_report import audit_batch, import_report, parse_state_daily_report, stage_downloaded_reports, write_batch_import_artifacts
@@ -58,6 +59,9 @@ def test_batch_audit_preserves_target_availability_gaps_and_excludes_duplicate_f
     artifacts = write_batch_import_artifacts((present, duplicate, absent), tmp_path / "output", reference=_reference(), target_market="Vellore APMC", target_commodity="Paddy(Common)", required_price_unit="Rs./Quintal", retrieved_at=datetime(2026, 9, 22, tzinfo=timezone.utc))
     assert len(artifacts) == 2
     assert all(Path(item["manifest"]).exists() for item in artifacts)
+    replay_file = next(Path(item["replay_file"]) for item in artifacts if Path(item["replay_file"]).read_text(encoding="utf-8").strip())
+    replayed = json.loads(replay_file.read_text(encoding="utf-8").splitlines()[0])
+    assert replayed["source"] == "replayed_historical"
 
 
 def test_staging_uses_internal_report_date_and_reports_missing_window_dates(tmp_path) -> None:

@@ -235,7 +235,15 @@ def write_import_artifacts(result: ImportResult, report_file: Path, output_dir: 
     digest = sha256(report_file.read_bytes()).hexdigest()
     stem = f"agmarknet-state-daily-{digest[:16]}"
     replay, rejected, manifest = (output_dir / f"{stem}.replayed.ndjson", output_dir / f"{stem}.rejected.ndjson", output_dir / f"{stem}.manifest.json")
-    replay.write_text("\n".join(event.to_json() for event in result.events) + ("\n" if result.events else ""), encoding="utf-8")
+    # The normalized event ID retains the provider name in its deterministic
+    # lineage.  The *delivery mode* is different: this file is a historical
+    # replay artifact and must pass the replay gate rather than masquerading as
+    # a live provider event.  Keep that distinction in the envelope source.
+    replay_events = tuple(EventEnvelope(
+        event.event_id, event.event_type, event.event_time, event.ingestion_time,
+        "replayed_historical", event.schema_version, event.payload,
+    ) for event in result.events)
+    replay.write_text("\n".join(event.to_json() for event in replay_events) + ("\n" if replay_events else ""), encoding="utf-8")
     rejected.write_text("\n".join(json.dumps(row, sort_keys=True, default=str) for row in result.rejected) + ("\n" if result.rejected else ""), encoding="utf-8")
     manifest.write_text(json.dumps({
         "classification": "replayed_historical", "provider": PROVIDER, "source": SOURCE, "input_url": INPUT_URL, "output_url": OUTPUT_URL, "retrieved_at": retrieved_at.isoformat(), "raw_report_path": str(report_file), "raw_report_sha256": digest,

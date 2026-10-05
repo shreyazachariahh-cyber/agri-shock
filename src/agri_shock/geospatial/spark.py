@@ -63,12 +63,17 @@ def district_reported_flood_shocks(floods: Any, district_boundaries: Any) -> Any
     """Associate only an authoritative source-reported district identity.
 
     This deliberately does not spatially intersect a district boundary: the
-    boundary is a reference key, not an asserted inundation footprint.
+    boundary is a reference key, not an asserted inundation footprint.  The
+    source-envelope ``event_time`` remains the source observation time; for a
+    bounded historical report, the association clock is the explicit
+    ``event_start`` of its evidence window.  This permits a price observed
+    during that documented window to be associated without backdating the raw
+    source event itself.
     """
     from pyspark.sql import functions as F
     reference = district_boundaries.select("district_id", F.upper(F.trim("source_state")).alias("_source_state"), F.upper(F.trim("source_district")).alias("_source_district"))
     reported = floods.filter(F.col("geometry_json").isNull() & F.col("reported_state").isNotNull() & F.col("reported_district").isNotNull()).select("*", F.upper(F.trim("reported_state")).alias("_source_state"), F.upper(F.trim("reported_district")).alias("_source_district"))
-    return reported.join(reference, ["_source_state", "_source_district"], "inner").select(F.col("event_id").alias("shock_id"), F.lit("flood").alias("shock_type"), F.col("event_time").alias("shock_time"), "district_id", F.lit("source_reported_district").alias("spatial_relationship"), F.lit(None).cast("double").alias("shock_severity"), F.col("source_event_id").alias("source_reference"))
+    return reported.join(reference, ["_source_state", "_source_district"], "inner").select(F.col("event_id").alias("shock_id"), F.lit("flood").alias("shock_type"), F.coalesce(F.to_timestamp("event_start"), F.col("event_time")).alias("shock_time"), "district_id", F.lit("source_reported_district").alias("spatial_relationship"), F.lit(None).cast("double").alias("shock_severity"), F.col("source_event_id").alias("source_reference"))
 
 def flood_shocks(floods: Any, district_boundaries: Any) -> Any:
     """Spatially associate GeoJSON flood geometry to canonical districts."""
