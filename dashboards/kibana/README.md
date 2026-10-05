@@ -12,10 +12,12 @@ This prevents the existing `synthetic_demo` Dhemaji smoke record from appearing
 as real evidence. The data view targets `agrishock-market-shock-signals-*`,
 using `event_time` as its time field.
 
-Panels cover case/provenance, signal strength, confidence, observed price,
-baseline median, deviation, robust anomaly, the conservative LOW-result
-explanation, and recorded pipeline evidence. The association count is an
-annotated Phase 13D validation result, not a fabricated live metric.
+The first viewport presents case/provenance, a prominent LOW status, signal
+strength, 87.5% evidence confidence, and 11 verified associations. It then
+compares ₹2,993 observed price with the ₹1,851 historical median before
+showing deviation, robust anomaly, the conservative LOW-result explanation,
+and recorded pipeline evidence. The association count is an annotated Phase
+13D validation result, not a fabricated live metric.
 
 ## Provisioning
 

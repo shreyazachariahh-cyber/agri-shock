@@ -17,10 +17,10 @@ Synthetic smoke data is excluded by default.
 
 | Panel | Purpose |
 |---|---|
-| Case overview | Event, district, market, series, date, and provenance. |
-| Strength / confidence | Separates LOW 9.29 strength from 0.875 confidence. |
-| Observed / baseline | Compares 2993.0 Rs./Quintal with 1851.0 median. |
-| Deviation / robust anomaly | Shows +61.6964% and +6.3659 as unusual movement, not distress proof. |
+| Header | AgriShock, Vellore, Cyclone Michaung, December 2023, and replayed-historical provenance. |
+| Status / strength / confidence / associations | Makes LOW, 9.29 strength, 87.5% confidence, and 11 verified associations immediately visible. |
+| Observed versus baseline | Compares ₹2,993 observed with ₹1,851 historical median from the 22-observation fixed baseline. |
+| Price movement / historical unusualness | Shows +61.7% and +6.37 as unusual movement, not distress proof. |
 | LOW explanation | Makes absent decline, normalized severity, and control explicit. |
 | Pipeline evidence | Records 96 Bronze, 95 Silver mandi, 1 Silver flood, 11 associations, one Gold signal. |
 
@@ -36,9 +36,9 @@ python scripts/provision_kibana_dashboard.py --url http://localhost:5601
 ```
 
 The provisioner is idempotent at saved-object identity level. It does not
-alter Elasticsearch signal documents. A local user need only open Kibana to
-visually inspect the provisioned dashboard; manual panel construction is not
-required.
+alter Elasticsearch signal documents. The compact dashboard layout deliberately
+puts case → signal → observed versus baseline → anomaly → interpretation →
+pipeline evidence in that order; manual panel construction is not required.
 
 ## 60–90 second walkthrough
 
