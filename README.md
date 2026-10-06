@@ -142,4 +142,8 @@ tests/                unit, data-quality, integration-contract, and chaos tests
 
 ## License
 
-No license has been selected yet. Choose one before making the repository publicly reusable.
+AgriShock source code and repository-authored documentation are licensed under
+the [MIT License](LICENSE). This license does not override the terms,
+provenance requirements, or redistribution restrictions of third-party source
+data, official reports, or external documentation; consult each source's own
+terms before reuse.
