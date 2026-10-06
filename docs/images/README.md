@@ -1,32 +1,18 @@
-# Dashboard image capture
+# Dashboard images
 
-No image is committed until a reviewer captures it from the actual local
-Kibana dashboard. Do not generate, retouch, or substitute a mockup.
+`vellore-dashboard-hero.png` is the approved genuine local Kibana capture of
+the dark **AgriShock — Vellore real historical case** dashboard.
 
-After provisioning the real dashboard with `--dark-appearance`, refresh Kibana,
-switch to dashboard view/full-screen mode, and capture the following genuine
-images:
+| Attribute | Value |
+|---|---|
+| Capture type | Local Kibana dashboard, view mode |
+| Provenance | Pinned `replayed_historical` Vellore signal; synthetic records excluded |
+| Dimensions | 1917 × 807 px |
+| Content | Header, LOW status, strength, confidence, associations, real two-bar price comparison, anomaly evidence, interpretation, and replay pipeline evidence |
 
-1. `vellore-dashboard-hero.png` — first viewport showing the AgriShock header,
-   Vellore/Michaung context, `REPLAYED HISTORICAL`, LOW status, confidence,
-   associations, and observed-versus-baseline comparison.
-2. `vellore-dashboard-interpretation.png` — LOW explanation with price movement
-   and robust anomaly cards.
-3. `vellore-dashboard-pipeline.png` — compact pipeline-evidence panel.
+The image is an observational dashboard view. It does not establish causality,
+a flood footprint, normalized severity, farmer distress, or trader conduct.
+It is unedited; do not replace it with a mockup or generated image.
 
-Use the dashboard's pinned real-historical filter and Dec 2023 time range.
-Avoid browser/profile chrome and any local paths, account information, or
-synthetic records. Review every capture before committing it; the image must
-not imply a causal finding, a flood footprint, or a normalized severity score.
-
-## Exact hero capture
-
-```powershell
-python scripts/provision_kibana_dashboard.py --url http://localhost:5601 --dark-appearance
-```
-
-Open `http://localhost:5601`, select **AgriShock — Vellore real historical
-case**, wait for the values and price bars to load, click **Full screen**, and
-use the operating system's screenshot tool. Save the unedited capture as
-`docs/images/vellore-dashboard-hero.png`. Confirm the filter still pins
-`replayed_historical` and the Vellore signal ID before saving.
+Future captures, if any, must use the same pinned real-historical filter and
+must not expose browser/profile information, local paths, or synthetic data.

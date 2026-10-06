@@ -4,6 +4,8 @@
 
 > AgriShock produces observational market-shock signals—not causal findings. It does not prove farmer distress, flood impact, or trader misconduct.
 
+![AgriShock Kibana dashboard showing the Vellore Cyclone Michaung historical replay signal](docs/images/vellore-dashboard-hero.png)
+
 ## Why AgriShock?
 
 Agricultural prices, weather observations, and flood evidence commonly arrive through disconnected systems, at different times, and with incompatible geographic identifiers. AgriShock treats that as a data-engineering problem: it validates and normalizes source events, preserves provenance, and associates them using event time and authoritative geographic context.
@@ -57,10 +59,9 @@ The observed movement was statistically unusual but **positive**, not a price de
 
 The primary Kibana dashboard is version-controlled and pins both `fixture_kind: replayed_historical` and the deterministic Vellore signal ID, so the existing synthetic smoke record cannot appear as real evidence. It shows the case, LOW status, confidence, observed-versus-baseline comparison, anomaly evidence, interpretation, and verified pipeline path.
 
-No screenshot is committed yet. After final human review, capture a genuine
-dashboard hero as `docs/images/vellore-dashboard-hero.png`; the exact safe
-capture checklist is in [docs/images/README.md](docs/images/README.md). Never
-substitute a mockup or a synthetic record for this image.
+The hero image above is a genuine local Kibana capture of the pinned
+replayed-historical Vellore case. Its capture constraints and provenance are
+documented in [docs/images/README.md](docs/images/README.md).
 
 Provision locally:
 
